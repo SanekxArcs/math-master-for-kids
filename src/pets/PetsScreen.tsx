@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useAnimate, type MotionStyle } from "motion/react";
-import { Hand, Heart, Moon, PawPrint, Pause, Play, Plus, Shirt, ShoppingBasket, Sparkles } from "lucide-react";
+import { Hand, Heart, Moon, PawPrint, Pause, Pencil, Play, Plus, Shirt, ShoppingBasket, Sparkles } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import {
+  NAME_MAX,
   PET_COOLDOWN_MS,
   PLAY_COOLDOWN_MS,
   REVIVE_PRICE,
@@ -21,6 +22,7 @@ import {
   itemsFor,
   needsCare,
   onVacation,
+  rename,
   revive,
   setVacation,
   shownMood,
@@ -292,10 +294,12 @@ function NameField({
   value,
   onChange,
   placeholder,
+  autoFocus,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
+  autoFocus?: boolean;
 }) {
   const { t } = useI18n();
   return (
@@ -303,8 +307,9 @@ function NameField({
       <span className={labelClass}>{t("petName")}</span>
       <input
         value={value}
-        onChange={(event) => onChange(event.target.value.slice(0, 20))}
+        onChange={(event) => onChange(event.target.value.slice(0, NAME_MAX))}
         placeholder={placeholder}
+        autoFocus={autoFocus}
         className={cn(fieldClass, "text-center text-2xl")}
       />
     </label>
@@ -502,6 +507,7 @@ function Stall({
   const caughtRef = useRef(0);
   const taps = useRef(0);
   const [grownUpOpen, setGrownUpOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
   const pressTimer = useRef<number | null>(null);
   const sceneRef = useRef<HTMLDivElement>(null);
   const [figure, animateFigure] = useAnimate<HTMLButtonElement>();
@@ -687,16 +693,27 @@ function Stall({
         <div className="px-5 pb-5 pt-3 text-center">
           {/* The grown-up switch hides behind a long press on the name: findable
               by someone who was told where it is, not by a child tapping around. */}
-          <h2
-            className="select-none font-display text-3xl font-black text-foreground"
-            onPointerDown={startPress}
-            onPointerUp={endPress}
-            onPointerLeave={endPress}
-            onPointerCancel={endPress}
-            onContextMenu={(event) => event.preventDefault()}
-          >
-            {pet.name}
-          </h2>
+          <div className="flex items-center justify-center gap-2">
+            <h2
+              className="min-w-0 select-none wrap-break-word font-display text-3xl font-black text-foreground"
+              onPointerDown={startPress}
+              onPointerUp={endPress}
+              onPointerLeave={endPress}
+              onPointerCancel={endPress}
+              onContextMenu={(event) => event.preventDefault()}
+            >
+              {pet.name}
+            </h2>
+            {/* Beside the name rather than on it, so the long press stays the grown-ups'. */}
+            <button
+              type="button"
+              onClick={() => setRenaming(true)}
+              aria-label={t("renamePet", { name: pet.name })}
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted/70 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-4 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              <Pencil className="size-4" aria-hidden />
+            </button>
+          </div>
           {/* What the pet would say, in a speech bubble — urgent ones in red. */}
           <motion.p
             key={mood}
@@ -831,8 +848,40 @@ function Stall({
             </GameDialog>
           </Backdrop>
         )}
+        {renaming && <RenameDialog pet={pet} onClose={() => setRenaming(false)} />}
       </AnimatePresence>
     </>
+  );
+}
+
+/** A new name for the pet on screen, as often as the child likes. */
+function RenameDialog({ pet, onClose }: { pet: Pet; onClose: () => void }) {
+  const { t } = useI18n();
+  const [name, setName] = useState(pet.name);
+
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    updateStable((current) => rename(current, pet.id, name));
+    onClose();
+  };
+
+  return (
+    <Backdrop>
+      <GameDialog hero={<PetArt species={pet.species} worn={pet.worn} className="size-16" />}>
+        <form onSubmit={submit}>
+          <h2 className="font-display text-2xl font-black">{t("renameTitle")}</h2>
+          <div className="mt-4">
+            <NameField value={name} onChange={setName} placeholder={pet.name} autoFocus />
+          </div>
+          <button type="submit" disabled={!name.trim()} className={cn(primaryActionClass, "mt-6 disabled:opacity-40")}>
+            {t("saveName")}
+          </button>
+          <button type="button" onClick={onClose} className={cn(ghostActionClass, "mt-1")}>
+            {t("cancel")}
+          </button>
+        </form>
+      </GameDialog>
+    </Backdrop>
   );
 }
 

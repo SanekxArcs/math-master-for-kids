@@ -73,6 +73,23 @@ describe("PetsScreen", () => {
     expect(saved().coins).toBe(10);
   });
 
+  it("renames the pet whenever the child likes", async () => {
+    const user = userEvent.setup();
+    seed([newPet("horse", "Bella", Date.now())], 10);
+    renderPets();
+
+    await user.click(screen.getByRole("button", { name: "Change Bella's name" }));
+    const dialog = screen.getByRole("dialog");
+    const field = within(dialog).getByLabelText("Your pet's name");
+    await user.clear(field);
+    await user.type(field, "Star");
+    await user.click(within(dialog).getByRole("button", { name: "Save name" }));
+
+    expect(await screen.findByRole("heading", { name: "Star" })).toBeInTheDocument();
+    expect(saved().pets[0]!.name).toBe("Star");
+    expect(saved().coins).toBe(10);
+  });
+
   it("feeds the pet on screen for coins", async () => {
     const user = userEvent.setup();
     seed([{ ...newPet("horse", "Bella", Date.now()), food: 30 }], 10);

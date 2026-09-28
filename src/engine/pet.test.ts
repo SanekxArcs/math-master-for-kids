@@ -35,6 +35,7 @@ import {
   moodOf,
   newPet,
   payReward,
+  rename,
   revive,
   sessionReward,
   setVacation,
@@ -203,6 +204,30 @@ describe("adopting", () => {
     const two = adopt(stable([full()], 100), "cat", "Rudy", T0);
     expect(choose(two, "horse").activeId).toBe("horse");
     expect(choose(two, "dog")).toBe(two);
+  });
+});
+
+describe("renaming", () => {
+  it("gives a pet a new name, trimmed, and nothing else changes", () => {
+    const two = adopt(stable([full()], 100), "cat", "Rudy", T0);
+    const renamed = rename(two, "horse", "  Bella  ");
+    expect(renamed.pets.map((pet) => pet.name)).toEqual(["Bella", "Rudy"]);
+    expect(renamed.coins).toBe(two.coins);
+    expect(renamed.activeId).toBe(two.activeId);
+  });
+
+  it("works as often as liked, even for a pet that is gone", () => {
+    const gone = stable([{ ...full(), alive: false }]);
+    const once = rename(gone, "horse", "Star");
+    expect(rename(once, "horse", "Moon").pets[0]!.name).toBe("Moon");
+  });
+
+  it("keeps the old name for a blank one, and caps a long one", () => {
+    const start = stable();
+    expect(rename(start, "horse", "   ")).toBe(start);
+    expect(rename(start, "horse", "Sparky")).toBe(start);
+    expect(rename(start, "cat", "Rudy")).toBe(start);
+    expect(rename(start, "horse", "x".repeat(30)).pets[0]!.name).toHaveLength(20);
   });
 });
 

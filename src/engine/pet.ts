@@ -591,6 +591,20 @@ export function choose(stable: Stable, petId: Species): Stable {
   return { ...stable, activeId: petId };
 }
 
+/** The longest name a pet can have: enough for any name, short enough for the tabs. */
+export const NAME_MAX = 20;
+
+/**
+ * A new name, whenever the child likes — even for a pet that is gone. A blank
+ * one is ignored rather than leaving the pet nameless.
+ */
+export function rename(stable: Stable, petId: Species, name: string): Stable {
+  const pet = findPet(stable, petId);
+  const chosen = name.trim().slice(0, NAME_MAX);
+  if (!pet || !chosen || chosen === pet.name) return stable;
+  return withPet(stable, { ...pet, name: chosen });
+}
+
 /** One switch for the whole family: a holiday is a holiday for everyone. */
 export function setVacation(stable: Stable, on: boolean, now: number): Stable {
   if (stable.pets.length === 0) return stable;
