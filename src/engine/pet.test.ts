@@ -252,6 +252,17 @@ describe("revive", () => {
     expect(back.pets[0]!.updatedAt).toBe(T0 + DAY);
   });
 
+  it("brings back a pet that died since it was last saved", () => {
+    // Saved alive; the screen ticks it to gone, but nothing wrote that back.
+    const neglected = stable([full()], REVIVE_PRICE);
+    const later = T0 + 30 * DAY;
+    expect(tick(neglected.pets[0]!, later).alive).toBe(false);
+    const back = revive(neglected, "horse", later);
+    expect(back.coins).toBe(0);
+    expect(back.pets[0]!.alive).toBe(true);
+    expect(back.pets[0]!.health).toBe(50);
+  });
+
   it("does nothing without enough coins", () => {
     const before = stable([gone], REVIVE_PRICE - 1);
     expect(revive(before, "horse", T0)).toBe(before);

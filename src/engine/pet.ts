@@ -541,8 +541,12 @@ export function wishProgress(stable: Stable): { pet: Pet; item: Accessory; have:
 }
 
 export function revive(stable: Stable, petId: Species, now: number): Stable {
-  const pet = findPet(stable, petId);
-  if (!pet || pet.alive || stable.coins < REVIVE_PRICE) return stable;
+  const found = findPet(stable, petId);
+  if (!found) return stable;
+  // Brought up to now first: the screen shows a pet that died since the last
+  // save as gone, while the saved copy still says alive.
+  const pet = tick(found, now);
+  if (pet.alive || stable.coins < REVIVE_PRICE) return stable;
   return {
     ...withPet(stable, {
       ...pet,
