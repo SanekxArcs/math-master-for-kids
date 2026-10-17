@@ -151,6 +151,19 @@ async function foldIntoFact(
   });
 }
 
+/** Restore adaptive practice on a linked device without streaming every fact. */
+export const factsForDevice = query({
+  args: { profileId: v.id("profiles"), deviceToken: v.string() },
+  handler: async (ctx, { profileId, deviceToken }) => {
+    if (!(await checkDevice(ctx, profileId, deviceToken))) return [];
+    const rows = await ctx.db.query("factStats")
+      .withIndex("by_profile_difficulty", (q) => q.eq("profileId", profileId)).collect();
+    return rows.map(({ factKey, attempts, correct, totalMs, bestMs, strength, lastSeenAt }) => ({
+      id: factKey, attempts, correct, totalMs, bestMs, strength, lastSeenAt,
+    }));
+  },
+});
+
 /** Live settings for the kid's device. Parent edits arrive through this. */
 export const settingsForDevice = query({
   args: { profileId: v.id("profiles"), deviceToken: v.string() },

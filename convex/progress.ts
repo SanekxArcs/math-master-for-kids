@@ -14,11 +14,12 @@ export const forDevice = query({
       .query("progress")
       .withIndex("by_profile", (q) => q.eq("profileId", profileId))
       .unique();
-    if (!row) return { status: "ok" as const, progress: null };
-    const { coins, lastBonusDay, pets, activeId, savedAt, level, wish } = row;
+    if (!row) return { status: "ok" as const, progress: null, revision: null };
+    const { _id: _rowId, _creationTime: _created, profileId: _profile, updatedAt: _updated, revision, ...progress } = row;
     return {
       status: "ok" as const,
-      progress: { coins, lastBonusDay, pets, activeId, savedAt, level, wish: wish ?? null },
+      progress,
+      revision: revision ?? 0,
     };
   },
 });
@@ -26,19 +27,19 @@ export const forDevice = query({
 /**
  * Backs up the device's progress.
  *
- * The newest snapshot wins, by the device clock of the change it carries: a
- * device coming back online with an older copy — the tablet that sat in a
- * drawer while the phone was played on — must not overwrite newer progress.
- * The level is part of the snapshot like everything else: losing a game sends
- * it back to 1, so "keep the highest" would quietly undo that.
+ * Modern clients supply the server revision they read. Competing saves return
+ * a conflict; device clocks cannot overwrite a different revision. The level
+ * remains part of the complete snapshot, including an intentional reset to 1.
+ * Legacy clients can update legacy rows only, until the first modern save.
  */
 export const save = mutation({
   args: {
     profileId: v.id("profiles"),
     deviceToken: v.string(),
     progress: v.object(progressFields),
+    baseRevision: v.optional(v.union(v.number(), v.null())),
   },
-  handler: async (ctx, { profileId, deviceToken, progress }) => {
+  handler: async (ctx, { profileId, deviceToken, progress, baseRevision }) => {
     if (!(await checkDevice(ctx, profileId, deviceToken))) {
       return { status: "unlinked" as const };
     }
@@ -54,16 +55,29 @@ export const save = mutation({
       .withIndex("by_profile", (q) => q.eq("profileId", profileId))
       .unique();
 
+    const revision = existing ? existing.revision ?? 0 : null;
+    if (baseRevision !== undefined && baseRevision !== revision) {
+      if (!existing) return { status: "conflict" as const, progress: null, revision: null };
+      const { _id: _rowId, _creationTime: _created, profileId: _profile, updatedAt: _updated, revision: _revision, ...backup } = existing;
+      return { status: "conflict" as const, progress: backup, revision };
+    }
+    // An old app cannot erase the new portable state after a modern save.
+    if (baseRevision === undefined && existing?.revision !== undefined) {
+      return { status: "upgrade_required" as const };
+    }
+    const nextRevision = (revision ?? 0) + 1;
+    const versionFields = baseRevision === undefined ? {} : { revision: nextRevision };
+
     if (!existing) {
-      await ctx.db.insert("progress", { profileId, ...incoming, updatedAt: Date.now() });
-      return { status: "ok" as const, applied: true };
+      await ctx.db.insert("progress", { profileId, ...incoming, updatedAt: Date.now(), ...versionFields });
+      return { status: "ok" as const, applied: true, revision: baseRevision === undefined ? 0 : nextRevision };
     }
 
-    if (incoming.savedAt < existing.savedAt) {
+    if (baseRevision === undefined && incoming.savedAt <= existing.savedAt) {
       return { status: "ok" as const, applied: false };
     }
 
-    await ctx.db.patch(existing._id, { ...incoming, updatedAt: Date.now() });
-    return { status: "ok" as const, applied: true };
+    await ctx.db.patch(existing._id, { ...incoming, updatedAt: Date.now(), ...versionFields });
+    return { status: "ok" as const, applied: true, revision: baseRevision === undefined ? 0 : nextRevision };
   },
 });

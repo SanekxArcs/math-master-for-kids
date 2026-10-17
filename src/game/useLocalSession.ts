@@ -1,6 +1,8 @@
 import { useCallback, useState } from "react";
 import type { HintModel, Op, Problem, Question, ScoreState } from "@/engine";
 import type { SessionSnapshot } from "./useGame";
+import { touchStable } from "./useStable";
+import { profileKey } from "@/sync/profileScope";
 
 const KEY = "math_master_session";
 
@@ -9,8 +11,8 @@ const KEY = "math_master_session";
  *
  * This exists for the refresh, the accidental back-swipe and the browser that
  * reloads itself while the tablet is asleep — not for "carry on with
- * yesterday's points". A gap longer than this and the child gets a clean start,
- * which is what they expect when they sit down to play again.
+ * yesterday's points". A gap longer than this clears an unfinished round.
+ * A won board is retained until the child moves to the next level.
  */
 const MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
@@ -99,7 +101,7 @@ function toScore(raw: unknown): ScoreState {
 export function readSession(now: number = Date.now()): SessionSnapshot | null {
   if (typeof localStorage === "undefined") return null;
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(profileKey(KEY));
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as unknown;
@@ -107,7 +109,9 @@ export function readSession(now: number = Date.now()): SessionSnapshot | null {
 
     const source = parsed as Record<string, unknown>;
     const savedAt = num(source.savedAt);
-    if (savedAt <= 0 || now - savedAt > MAX_AGE_MS) return null;
+    // A won level is earned progress, even if the next-level button has not
+    // been pressed yet. It must survive tomorrow and a transfer to a tablet.
+    if (savedAt <= 0 || (source.won !== true && now - savedAt > MAX_AGE_MS)) return null;
 
     const question = toQuestion(source.question);
 
@@ -134,7 +138,19 @@ export function readSession(now: number = Date.now()): SessionSnapshot | null {
 export function writeSession(snapshot: SessionSnapshot): void {
   if (typeof localStorage === "undefined") return;
   try {
-    localStorage.setItem(KEY, JSON.stringify(snapshot));
+    const previous = localStorage.getItem(profileKey(KEY));
+    localStorage.setItem(profileKey(KEY), JSON.stringify(snapshot));
+    // Mounting/resuming writes a new wall-clock time, which is not gameplay.
+    // Only real changes should compete with another device's saved game.
+    const content = (raw: string | null) => {
+      try {
+        const { savedAt: _stamp, ...rest } = JSON.parse(raw ?? "null");
+        return JSON.stringify(rest);
+      } catch {
+        return null;
+      }
+    };
+    if (content(previous) !== content(JSON.stringify(snapshot))) touchStable();
   } catch {
     // Private mode or a full quota. Losing the resume is better than crashing.
   }

@@ -49,12 +49,13 @@ import {
 import { updateStable, useLiveStable, useStable } from "./useStable";
 import type { GameSettings } from "@/engine";
 import type { SyncStatus } from "@/sync/useSync";
+import { profileKey } from "@/sync/profileScope";
 
 const LOST_FROM = "math_master_lost_from";
 
 function readLostFrom(): number | null {
   try {
-    const value = Number(localStorage.getItem(LOST_FROM));
+    const value = Number(localStorage.getItem(profileKey(LOST_FROM)));
     return Number.isFinite(value) && value >= 1 ? value : null;
   } catch {
     return null;
@@ -63,8 +64,8 @@ function readLostFrom(): number | null {
 
 function writeLostFrom(level: number | null): void {
   try {
-    if (level === null) localStorage.removeItem(LOST_FROM);
-    else localStorage.setItem(LOST_FROM, String(level));
+    if (level === null) localStorage.removeItem(profileKey(LOST_FROM));
+    else localStorage.setItem(profileKey(LOST_FROM), String(level));
   } catch {
     /* private mode: the wording just falls back after a reload */
   }

@@ -1,5 +1,6 @@
 import { EMPTY_FACT, factId, updateFact, type FactOutcome, type FactStat } from "@/engine";
 import { db } from "./db";
+import { activeProfile, legacyProfile } from "./profileScope";
 
 /**
  * The child's per-fact record, held locally.
@@ -12,10 +13,17 @@ export interface StoredFact extends FactStat {
   id: string;
 }
 
-export async function loadFacts(): Promise<Map<string, FactStat>> {
+export async function loadFacts(profileId = activeProfile()): Promise<Map<string, FactStat>> {
   try {
     const rows = await db.facts.toArray();
-    return new Map(rows.map(({ id, ...stat }) => [id, stat]));
+    const result = new Map<string, FactStat>();
+    for (const { id, ...stat } of rows) {
+      if (!id.includes("|") && profileId === legacyProfile()) result.set(id, stat);
+    }
+    for (const { id, ...stat } of rows) {
+      if (id.startsWith(`${profileId}|`)) result.set(id.slice(profileId.length + 1), stat);
+    }
+    return result;
   } catch {
     // A blocked IndexedDB means adaptive practice quietly degrades to a random
     // draw, which is a worse lesson plan but a perfectly playable game.
@@ -23,9 +31,9 @@ export async function loadFacts(): Promise<Map<string, FactStat>> {
   }
 }
 
-export async function persistFact(id: string, stat: FactStat): Promise<void> {
+export async function persistFact(id: string, stat: FactStat, profileId = activeProfile()): Promise<void> {
   try {
-    await db.facts.put({ id, ...stat });
+    await db.facts.put({ id: `${profileId}|${id}`, ...stat });
   } catch {
     /* see above */
   }

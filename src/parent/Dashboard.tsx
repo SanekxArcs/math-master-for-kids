@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import {
   CircleUserRound,
+  CircleHelp,
   Clock,
   Flame,
   Gamepad2,
@@ -33,6 +34,7 @@ import { SettingsForm } from "./SettingsForm";
 import { TablesGrid } from "./TablesGrid";
 import { Panel, PanelTitle, timeAgo } from "./ui";
 import type { ParentSession } from "./useParentSession";
+import { ParentOnboarding, needsParentTour } from "./ParentOnboarding";
 
 interface DashboardProps {
   session: ParentSession;
@@ -84,6 +86,7 @@ export function Dashboard({ session, device, onLogout }: DashboardProps) {
   const data = useQuery(api.parent.overview, { token: session.token, tzOffsetMinutes });
   const [tab, setTab] = useState<Tab>("overview");
   const [signingOut, setSigningOut] = useState(false);
+  const [touring, setTouring] = useState(() => needsParentTour(session.profileId));
 
   if (data === undefined) {
     return (
@@ -122,8 +125,11 @@ export function Dashboard({ session, device, onLogout }: DashboardProps) {
             </span>
           </div>
           <div className="flex items-center gap-1.5">
+            <button type="button" onClick={() => setTouring(true)} aria-label={t("parentGuide")} className="rounded-full p-2 text-primary hover:bg-secondary">
+              <CircleHelp className="size-5" aria-hidden />
+            </button>
             <Link
-              to="/"
+              to="/play"
               className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-bold transition-colors hover:border-primary/40"
             >
               <Gamepad2 className="size-4 text-primary" aria-hidden />
@@ -213,6 +219,7 @@ export function Dashboard({ session, device, onLogout }: DashboardProps) {
         </TabsPrimitive.Root>
       </main>
 
+      {touring && <ParentOnboarding profileId={session.profileId} pairCode={profile.pairCode} onDone={() => setTouring(false)} />}
       {createPortal(
         <AnimatePresence>
           {signingOut && (

@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft, ArrowRight, Eye, KeyRound, Play, Scissors, Settings2, X } from "lucide-react";
 import type { GameSettings } from "@/engine";
+import { profileKey } from "@/sync/profileScope";
 import { cn } from "@/lib/utils";
 import type { TranslationKey } from "@/i18n/translations";
 import { useI18n } from "@/i18n/useI18n";
@@ -28,7 +29,7 @@ const VERSION = "1";
 
 export function hasOnboarded(): boolean {
   try {
-    return localStorage.getItem(KEY) === VERSION;
+    return localStorage.getItem(profileKey(KEY)) === VERSION;
   } catch {
     return true; // storage refused: better no tour than one on every load
   }
@@ -36,7 +37,7 @@ export function hasOnboarded(): boolean {
 
 export function markOnboarded(): void {
   try {
-    localStorage.setItem(KEY, VERSION);
+    localStorage.setItem(profileKey(KEY), VERSION);
   } catch {
     /* private mode — it will just show again next time */
   }

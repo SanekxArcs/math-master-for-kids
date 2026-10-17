@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { activeProfile, profileKey } from "@/sync/profileScope";
 import {
   NEW_STABLE,
   SPECIES,
@@ -120,7 +121,7 @@ export function parseStable(raw: string | null): Stable {
 
 function readRaw(): string | null {
   try {
-    return localStorage.getItem(KEY);
+    return localStorage.getItem(profileKey(KEY));
   } catch {
     return null;
   }
@@ -135,10 +136,11 @@ function readRaw(): string | null {
 let cachedRaw: string | null | undefined;
 let cached: Stable = NEW_STABLE;
 /** Held in memory too, for the tablet in private mode where writes throw. */
-let fallback: Stable | null = null;
+const fallbacks = new Map<string, Stable>();
 
 function getSnapshot(): Stable {
   const raw = readRaw();
+  const fallback = fallbacks.get(activeProfile());
   if (fallback) return fallback;
   if (raw !== cachedRaw) {
     cachedRaw = raw;
@@ -152,21 +154,23 @@ const listeners = new Set<() => void>();
 function subscribe(listener: () => void) {
   listeners.add(listener);
   const onStorage = (event: StorageEvent) => {
-    if (event.key === KEY || event.key === null) listener();
+    if (event.key === profileKey(KEY) || event.key === null) listener();
   };
   window.addEventListener("storage", onStorage);
+  window.addEventListener("math-master-profile", listener);
   return () => {
     listeners.delete(listener);
     window.removeEventListener("storage", onStorage);
+    window.removeEventListener("math-master-profile", listener);
   };
 }
 
 function write(next: Stable): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(next));
-    fallback = null;
+    localStorage.setItem(profileKey(KEY), JSON.stringify(next));
+    fallbacks.delete(activeProfile());
   } catch {
-    fallback = next;
+    fallbacks.set(activeProfile(), next);
   }
   for (const listener of listeners) listener();
 }
@@ -188,13 +192,11 @@ export function updateStable(step: (stable: Stable) => Stable): void {
  * Stamps the device's copy as changed now, for a change kept outside the
  * stable — the level — so the backup takes this device's copy as the newest.
  *
- * Never on a device that has not changed anything yet: stamping an empty,
- * freshly linked stable would make it look newer than the real backup and
- * send it over the top of the child's pets.
+ * Play is gated on the first restore, so even the first level/session change
+ * can safely stamp an otherwise empty stable.
  */
 export function touchStable(): void {
   const current = getSnapshot();
-  if (current.savedAt === 0) return;
   write({ ...current, savedAt: Math.max(Date.now(), current.savedAt + 1) });
 }
 

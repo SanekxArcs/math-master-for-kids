@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { convex } from "@/lib/convex";
 import { isLang } from "@/i18n/translations";
@@ -8,8 +9,9 @@ import { useFactStats } from "@/sync/useFactStats";
 import { BackupSync } from "@/sync/BackupSync";
 import { PetsScreen } from "@/pets/PetsScreen";
 import { GameScreen } from "./GameScreen";
-import { PairCodeCard } from "./PairCodeCard";
-import { SetupScreen } from "./SetupScreen";
+import { RestoreForm } from "./SetupScreen";
+import { parsePairCode } from "@/pair/pairLink";
+import { lockParentAccess } from "@/sync/parentAccess";
 import { useLocalSettings } from "./useLocalSettings";
 
 /**
@@ -27,6 +29,7 @@ export type PlayView = "game" | "pets";
  * backup: coins spent in the shop are saved exactly like coins won.
  */
 export function PlayRoute({ view = "game" }: { view?: PlayView }) {
+  useEffect(() => { lockParentAccess(); }, []);
   return convex ? <SyncedGame view={view} /> : <LocalGame view={view} />;
 }
 
@@ -39,10 +42,12 @@ function LocalGame({ view }: { view: PlayView }) {
 }
 
 function SyncedGame({ view }: { view: PlayView }) {
-  const { identity, claim, link, unlink } = useDeviceIdentity();
+  const { identity, link, unlink } = useDeviceIdentity();
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
   const { settings, locale, unlinked } = useSyncedSettings(identity);
   const { status, record } = useOutboxSync(identity);
-  const { getStats, recordFacts } = useFactStats();
+  const { getStats, recordFacts } = useFactStats(identity);
   const { setLang } = useI18n();
 
   // Mastery is updated locally first and synchronously, so the very next
@@ -55,11 +60,6 @@ function SyncedGame({ view }: { view: PlayView }) {
     },
     [record, recordFacts],
   );
-
-  // The pairing code is generated on this device and shown nowhere else until
-  // the parent is already signed in — which needs the code. So it gets its own
-  // step, once, at the only moment the parent is certainly present.
-  const [codeToConfirm, setCodeToConfirm] = useState<string | null>(null);
 
   /**
    * The profile these credentials belong to is gone — deleted from the
@@ -86,25 +86,18 @@ function SyncedGame({ view }: { view: PlayView }) {
 
   if (identity === null) {
     return (
-      <SetupScreen
-        onCreate={async (name, pin, chosenLocale, avatarEmoji) => {
-          const created = await claim(name, pin, chosenLocale, avatarEmoji);
-          setCodeToConfirm(created.pairCode);
-        }}
-        onRestore={async (pairCode, pin) => {
-          await link(pairCode, pin);
+      <RestoreForm child
+        initialCode={parsePairCode(params.get("restore") ?? "")}
+        onCancel={() => navigate("/")}
+        onRestore={async (pairCode) => {
+          await link(pairCode);
+          navigate("/play", { replace: true });
         }}
       />
     );
   }
 
-  const screen = codeToConfirm ? (
-    <PairCodeCard
-      pairCode={codeToConfirm}
-      name={identity.name}
-      onDone={() => setCodeToConfirm(null)}
-    />
-  ) : view === "pets" ? (
+  const screen = view === "pets" ? (
     <PetsScreen />
   ) : (
     <GameScreen
@@ -117,9 +110,8 @@ function SyncedGame({ view }: { view: PlayView }) {
   );
 
   return (
-    <>
-      <BackupSync identity={identity} />
+    <BackupSync identity={identity}>
       {screen}
-    </>
+    </BackupSync>
   );
 }

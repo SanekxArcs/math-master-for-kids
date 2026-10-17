@@ -58,7 +58,7 @@ function Choose({ code }: { code: string }) {
             hint={t("openDashboardHint")}
           />
           {unlinked && (
-            <Option to={`/?restore=${code}`} icon={Gamepad2} title={t("playHere")} hint={t("playHereHint")} />
+            <Option to={`/play?restore=${code}`} icon={Gamepad2} title={t("playHere")} hint={t("playHereHint")} />
           )}
           {identity && <p className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">{t("alreadyLinked")}</p>}
         </div>

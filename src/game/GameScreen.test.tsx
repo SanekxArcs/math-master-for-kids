@@ -492,7 +492,7 @@ describe("GameScreen", () => {
     await waitFor(() => expect(screen.getAllByRole("dialog")).toHaveLength(1));
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).queryByText(/coins/)).toBeNull();
-    expect(localStorage.getItem("math_master_stable")).toBeNull();
+    expect(stable().coins).toBe(NEW_STABLE.coins);
   });
 
   it("keeps the goal bar and points in step", async () => {

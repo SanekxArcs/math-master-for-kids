@@ -342,6 +342,7 @@ function ConfirmSignOut({
   const { t } = useI18n();
   const [pending, setPending] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
   const online = typeof navigator === "undefined" || navigator.onLine;
 
   useEffect(() => {
@@ -355,6 +356,7 @@ function ConfirmSignOut({
       <GameDialog tone="lost" hero={<Smartphone className="size-10" aria-hidden />}>
         <h2 className="font-display text-2xl font-black">{t("signOutConfirmTitle")}</h2>
         <p className="mt-2 text-sm text-muted-foreground">{t("signOutDeviceHint", { name })}</p>
+        {failed && <p role="alert" className="mt-4 text-sm font-bold text-wrong">{t("backupFailed")}</p>}
         {(pending > 0 || !online) && (
           <p className="mt-4 flex items-start gap-2 rounded-lg bg-wrong/10 p-3 text-left text-sm font-bold text-wrong">
             <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -366,7 +368,11 @@ function ConfirmSignOut({
           disabled={busy}
           onClick={() => {
             setBusy(true);
-            void signOutDevice(device, token);
+            setFailed(false);
+            void signOutDevice(device, token).catch(() => {
+              setFailed(true);
+              setBusy(false);
+            });
           }}
           className={cn(primaryActionClass, "mt-6 from-wrong to-wrong/80 shadow-[0_10px_24px_-10px_var(--wrong)]")}
         >

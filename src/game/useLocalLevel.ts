@@ -1,5 +1,6 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { touchStable } from "./useStable";
+import { activeProfile, profileKey } from "@/sync/profileScope";
 
 const KEY = "math_master_level";
 
@@ -15,7 +16,7 @@ const KEY = "math_master_level";
 export function readLevel(): number {
   if (typeof localStorage === "undefined") return 1;
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(profileKey(KEY));
     if (!raw) return 1;
     const parsed = Number.parseInt(raw, 10);
     return Number.isFinite(parsed) && parsed >= 1 ? parsed : 1;
@@ -25,27 +26,36 @@ export function readLevel(): number {
 }
 
 /** Only used when storage refuses writes, so private mode keeps the level this sitting. */
-let memory: number | null = null;
+const memory = new Map<string, number>();
 const listeners = new Set<() => void>();
 
 function getSnapshot(): number {
-  return memory ?? readLevel();
+  return memory.get(activeProfile()) ?? readLevel();
 }
 
 function write(level: number): void {
   try {
-    localStorage.setItem(KEY, String(level));
-    memory = null;
+    localStorage.setItem(profileKey(KEY), String(level));
+    memory.delete(activeProfile());
   } catch {
     // Private mode or a full quota: they still get the level this sitting.
-    memory = level;
+    memory.set(activeProfile(), level);
   }
   for (const listener of listeners) listener();
 }
 
 function subscribe(listener: () => void) {
   listeners.add(listener);
-  return () => listeners.delete(listener);
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === profileKey(KEY) || event.key === null) listener();
+  };
+  window.addEventListener("storage", onStorage);
+  window.addEventListener("math-master-profile", listener);
+  return () => {
+    listeners.delete(listener);
+    window.removeEventListener("storage", onStorage);
+    window.removeEventListener("math-master-profile", listener);
+  };
 }
 
 /**
@@ -54,6 +64,7 @@ function subscribe(listener: () => void) {
 export function raiseLevel(level: number): void {
   if (level <= getSnapshot()) return;
   write(level);
+  touchStable();
 }
 
 /** The level as the game sees it, including the in-memory copy private mode falls back to. */
@@ -75,7 +86,6 @@ export function useLocalLevel() {
   // old stamp, so it could be overwritten or ping-pong between two devices.
   const advance = useCallback(() => {
     raiseLevel(getSnapshot() + 1);
-    touchStable();
   }, []);
   /**
    * Back to level 1 after a lost game. The stable is stamped too, because the

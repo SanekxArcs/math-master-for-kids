@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { FactStat, Op, Difficulty } from "@/engine";
 import type { AttemptRecord } from "@/game/useGame";
-import { applyOutcome, loadFacts, persistFact } from "./facts";
+import { applyOutcome, loadFacts, persistFact, type StoredFact } from "./facts";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { convex } from "@/lib/convex";
+import type { DeviceIdentity } from "./db";
+import { activeProfile } from "./profileScope";
 
 /**
  * Owns the child's per-fact record for this device.
@@ -11,23 +16,28 @@ import { applyOutcome, loadFacts, persistFact } from "./facts";
  * and a re-render between answering and the next question would be pure
  * overhead for something nothing renders.
  */
-export function useFactStats() {
+export function useFactStats(identity?: DeviceIdentity | null) {
   const stats = useRef<Map<string, FactStat>>(new Map());
+  const profileId = identity?.profileId ?? activeProfile();
 
   useEffect(() => {
     let cancelled = false;
-    void loadFacts().then((loaded) => {
+    stats.current = new Map();
+    void loadFacts(profileId).then((loaded) => {
       if (cancelled) return;
       // Merge rather than replace: answers given while IndexedDB was still
       // being read must not be thrown away.
       for (const [id, stat] of loaded) {
-        if (!stats.current.has(id)) stats.current.set(id, stat);
+        const current = stats.current.get(id);
+        if (!current || (stat.attempts >= current.attempts && stat.lastSeenAt >= current.lastSeenAt)) {
+          stats.current.set(id, stat);
+        }
       }
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [profileId]);
 
   const getStats = useCallback(() => stats.current as ReadonlyMap<string, FactStat>, []);
 
@@ -51,9 +61,38 @@ export function useFactStats() {
         },
         record.createdAt,
       );
-      void persistFact(id, stat);
+      void persistFact(id, stat, profileId);
     }
-  }, []);
+  }, [profileId]);
 
-  return { getStats, recordFacts };
+  const restoreFacts = useCallback((rows: StoredFact[]) => {
+    for (const { id, ...stat } of rows) {
+      const local = stats.current.get(id);
+      // Pending offline answers can already be ahead of the server.
+      if (local && (local.attempts > stat.attempts || local.lastSeenAt > stat.lastSeenAt)) continue;
+      stats.current.set(id, stat);
+      void persistFact(id, stat, profileId);
+    }
+  }, [profileId]);
+
+  // Restore once per device load, with retries. A subscription to the full
+  // history would download it again after every answer on every device.
+  useEffect(() => {
+    if (!identity || !convex) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const load = () => {
+      void convex!.query(api.attempts.factsForDevice, {
+        profileId: identity.profileId as Id<"profiles">, deviceToken: identity.deviceToken,
+      }).then((rows) => {
+        if (!cancelled) restoreFacts(rows);
+      }).catch(() => {
+        if (!cancelled) timer = setTimeout(load, 30_000);
+      });
+    };
+    load();
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [identity?.profileId, identity?.deviceToken, restoreFacts]);
+
+  return { getStats, recordFacts, restoreFacts };
 }

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
+import { I18nProvider } from "@/i18n/useI18n";
 
 const sync = vi.hoisted(() => ({ fail: true, calls: 0 }));
 
@@ -10,6 +11,7 @@ vi.mock("./useProgressSync", () => ({
     if (sync.fail) {
       throw new Error("Could not find public function for 'progress:forDevice'");
     }
+    return { ready: true, restoredVersion: 0, pending: false, failed: false };
   },
 }));
 
@@ -24,10 +26,10 @@ describe("BackupSync", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
 
     render(
-      <>
+      <I18nProvider>
         <BackupSync identity={identity} />
         <p>the game</p>
-      </>,
+      </I18nProvider>,
     );
     expect(screen.getByText("the game")).toBeInTheDocument();
 

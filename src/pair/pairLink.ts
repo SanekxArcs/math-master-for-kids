@@ -1,7 +1,7 @@
 /**
  * The pairing code as a link, so a QR code of it works with any phone's own
  * camera: scanning opens the app on the pairing page with the code already
- * filled in, and only the PIN is left to type.
+ * filled in. Child play uses the code alone; dashboard access also needs a PIN.
  */
 
 /** The server's code alphabet: no O/0, I/1 or S/5. */

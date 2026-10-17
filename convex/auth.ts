@@ -47,7 +47,7 @@ export async function checkDevice(
   const tokenHash = sha256(deviceToken);
   if (safeEqual(profile.deviceTokenHash, tokenHash)) return profile;
 
-  // A device linked later, with the pairing code and PIN.
+  // A device linked later with its child game code (or a legacy PIN link).
   const linked = await ctx.db
     .query("devices")
     .withIndex("by_profile_token", (q) => q.eq("profileId", profileId).eq("tokenHash", tokenHash))

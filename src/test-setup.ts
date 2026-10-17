@@ -36,5 +36,6 @@ if (typeof window !== "undefined") {
   afterEach(() => {
     cleanup();
     localStorage.clear();
+    sessionStorage.clear();
   });
 }

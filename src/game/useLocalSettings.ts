@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { DEFAULT_SETTINGS, type GameSettings } from "@/engine";
+import { profileKey } from "@/sync/profileScope";
 
 const KEY = "math_master_settings";
 
@@ -13,7 +14,7 @@ const KEY = "math_master_settings";
 function read(): GameSettings {
   if (typeof localStorage === "undefined") return DEFAULT_SETTINGS;
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(profileKey(KEY));
     if (!raw) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(raw) as unknown;
     // Never trust storage: a corrupt or half-migrated value must not be able to
@@ -34,7 +35,7 @@ export function useLocalSettings() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(KEY, JSON.stringify(settings));
+      localStorage.setItem(profileKey(KEY), JSON.stringify(settings));
     } catch {
       // Private mode or a full quota. Playing on is better than crashing.
     }

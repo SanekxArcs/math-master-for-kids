@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from "vitest";
 import { readSession, writeSession } from "./useLocalSession";
+import { readStable } from "./useStable";
 
 const T0 = 1_700_000_000_000;
 
@@ -51,6 +52,21 @@ describe("the stored session", () => {
     // than no score at all.
     writeSession(snapshot);
     expect(readSession(T0 + 7 * 60 * 60 * 1000)).toBeNull();
+  });
+
+  it("keeps a won level after a day, before the child taps next level", () => {
+    writeSession({ ...snapshot, won: true });
+    expect(readSession(T0 + 24 * 60 * 60 * 1000)?.won).toBe(true);
+  });
+
+  it("stamps progress for score changes but not a resume timestamp alone", () => {
+    writeSession(snapshot);
+    const savedAt = readStable().savedAt;
+    expect(savedAt).toBeGreaterThan(0);
+    writeSession({ ...snapshot, savedAt: T0 + 1000 });
+    expect(readStable().savedAt).toBe(savedAt);
+    writeSession({ ...snapshot, score: { ...snapshot.score, correct: 10 } });
+    expect(readStable().savedAt).toBeGreaterThan(savedAt);
   });
 
   it("ignores junk rather than letting it reach the game", () => {

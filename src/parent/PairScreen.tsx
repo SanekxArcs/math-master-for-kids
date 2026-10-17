@@ -16,9 +16,10 @@ interface PairScreenProps {
   busy: boolean;
   /** Filled in when the dashboard is opened on the child's own device. */
   knownCode?: string | null;
+  onBack?: () => void;
 }
 
-export function PairScreen({ onSubmit, error, busy, knownCode }: PairScreenProps) {
+export function PairScreen({ onSubmit, error, busy, knownCode, onBack }: PairScreenProps) {
   const { t } = useI18n();
   // Arriving from a scanned QR code: its code wins over this device's own.
   const [params] = useSearchParams();
@@ -121,10 +122,10 @@ export function PairScreen({ onSubmit, error, busy, knownCode }: PairScreenProps
             {busy ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <Lock className="size-5" aria-hidden />}
             {t("signIn")}
           </button>
-          <Link to="/" className={cn(ghostActionClass, "text-sm")}>
+          {onBack ? <button type="button" className={ghostActionClass} onClick={onBack}>{t("chooseRoleAgain")}</button> : <Link to="/" className={cn(ghostActionClass, "text-sm")}>
             <ArrowLeft className="size-4" aria-hidden />
-            {t("backToGame")}
-          </Link>
+            {t("chooseRoleAgain")}
+          </Link>}
         </div>
       </WelcomeCard>
     </WelcomeShell>

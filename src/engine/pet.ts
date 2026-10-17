@@ -242,7 +242,7 @@ export interface Stable {
   activeId: Species | null;
   /**
    * Epoch ms of the last change, 0 for a stable nobody has touched. What
-   * decides which copy wins when the device and the backup disagree.
+   * detects local changes; server revisions decide backup conflicts.
    */
   savedAt: number;
   /**

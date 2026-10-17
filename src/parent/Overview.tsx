@@ -5,12 +5,6 @@ import {
   BarChart3,
   CalendarDays,
   Check,
-  CircleUserRound,
-  History,
-  LayoutDashboard,
-  PartyPopper,
-  SlidersHorizontal,
-  Table2,
   Clock,
   Flame,
   HeartPulse,
@@ -28,7 +22,6 @@ import type { TranslationKey } from "@/i18n/translations";
 import { useI18n } from "@/i18n/useI18n";
 import { PetArt } from "@/pets/PetArt";
 import { readPet } from "@/game/useStable";
-import { primaryActionClass } from "@/game/GameDialog";
 import { AccuracyByOperation, EmptyNote, PracticeTrend, opLabel } from "./charts";
 import { suggest, weeks, type Suggestion } from "./suggestions";
 import { DeltaChip, OP_HUE, OP_SYMBOL, Panel, PanelTitle } from "./ui";
@@ -87,7 +80,6 @@ export function Overview({
 
   return (
     <div className="space-y-4">
-      <Welcome />
       <Panel>
         <PanelTitle icon={CalendarDays} title={t("thisWeek")} hint={t("vsLastWeek")} />
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
@@ -185,60 +177,6 @@ export function Overview({
         )}
       </Panel>
     </div>
-  );
-}
-
-const WELCOMED = "math_master_parent_welcomed";
-
-/**
- * The parent's walkthrough: a card, once, saying what each tab is for. Short
- * enough to read in passing, gone for good after "Got it".
- */
-function Welcome() {
-  const { t } = useI18n();
-  const [shown, setShown] = useState(() => {
-    try {
-      return localStorage.getItem(WELCOMED) === null;
-    } catch {
-      return false;
-    }
-  });
-  if (!shown) return null;
-
-  const rows = [
-    { icon: LayoutDashboard, text: t("pwOverview") },
-    { icon: Table2, text: t("pwTables") },
-    { icon: History, text: t("pwHistory") },
-    { icon: SlidersHorizontal, text: t("pwSettings") },
-    { icon: CircleUserRound, text: t("pwAccount") },
-  ];
-
-  return (
-    <Panel className="bg-linear-to-br from-combo/15 via-card/90 to-card/90">
-      <PanelTitle icon={PartyPopper} title={t("pwTitle")} hint={t("pwBody")} hue="var(--combo)" />
-      <ul className="space-y-2">
-        {rows.map(({ icon: Icon, text }) => (
-          <li key={text} className="flex items-start gap-2.5 text-sm">
-            <Icon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-            <span>{text}</span>
-          </li>
-        ))}
-      </ul>
-      <button
-        type="button"
-        onClick={() => {
-          try {
-            localStorage.setItem(WELCOMED, "1");
-          } catch {
-            /* private mode */
-          }
-          setShown(false);
-        }}
-        className={cn(primaryActionClass, "mt-4 w-auto px-5 py-2 text-base")}
-      >
-        {t("gotIt")}
-      </button>
-    </Panel>
   );
 }
 

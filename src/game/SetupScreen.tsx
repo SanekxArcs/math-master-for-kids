@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion, type MotionStyle } from "motion/react";
 import { Check, KeyRound, LineChart, Loader2, Lock, Play, RotateCcw } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -15,11 +15,13 @@ const AVATARS = ["🦊", "🐼", "🦁", "🐸", "🦄", "🐙", "🐝", "🦖"]
 interface SetupScreenProps {
   onCreate: (name: string, pin: string, locale: string, avatarEmoji: string) => Promise<unknown>;
   /** Links this device to a profile that already exists. */
-  onRestore?: (pairCode: string, pin: string) => Promise<unknown>;
+  onRestore?: (pairCode: string) => Promise<unknown>;
+  parentSetup?: boolean;
+  onBack?: () => void;
 }
 
 /** The language switch, above the card: the first thing to set, for everything below. */
-function LanguagePicker() {
+export function LanguagePicker() {
   const { t, lang, setLang } = useI18n();
   return (
     <fieldset>
@@ -59,7 +61,7 @@ function LanguagePicker() {
  * rather than leaving them to guess who is meant to type it. It sits in its
  * own panel, visibly apart from the child's half of the form.
  */
-export function SetupScreen({ onCreate, onRestore }: SetupScreenProps) {
+export function SetupScreen({ onCreate, onRestore, parentSetup = false, onBack }: SetupScreenProps) {
   const { t, lang } = useI18n();
   // "Play on this device" from a scanned QR code lands here with the code.
   const [params] = useSearchParams();
@@ -106,7 +108,7 @@ export function SetupScreen({ onCreate, onRestore }: SetupScreenProps) {
         className="space-y-6"
       >
         <div className="text-center">
-          <h1 className="font-display text-3xl font-black">{t("whosPlaying")}</h1>
+          <h1 className="font-display text-3xl font-black">{t(parentSetup ? "createChildTitle" : "whosPlaying")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{t("setupBlurb")}</p>
         </div>
 
@@ -219,7 +221,7 @@ export function SetupScreen({ onCreate, onRestore }: SetupScreenProps) {
             ) : (
               <Play className="size-5" fill="currentColor" aria-hidden />
             )}
-            {t("startPlaying")}
+            {t(parentSetup ? "createChildProfile" : "startPlaying")}
           </button>
 
           {/* A tablet whose site data was cleared lands here too, and a second
@@ -235,60 +237,64 @@ export function SetupScreen({ onCreate, onRestore }: SetupScreenProps) {
               that asks them to create a second profile for a child who already
               has one. This is the way out: the pairing code and PIN they already
               have are enough to reach the dashboard from any device. */}
-          <Link to="/parent" className={cn(ghostActionClass, "py-2 text-sm")}>
+          {onBack ? <button type="button" onClick={onBack} className={ghostActionClass}>{t("chooseRoleAgain")}</button> : <Link to="/parent" className={cn(ghostActionClass, "py-2 text-sm")}>
             <LineChart className="size-4" aria-hidden />
             {t("parentLogin")}
-          </Link>
+          </Link>}
         </div>
       </WelcomeCard>
     </WelcomeShell>
   );
 }
 
-function RestoreForm({
+export function RestoreForm({
   onRestore,
   initialCode,
   onCancel,
+  child = false,
 }: {
-  onRestore: (pairCode: string, pin: string) => Promise<unknown>;
+  onRestore: (pairCode: string) => Promise<unknown>;
   initialCode: string | null;
   onCancel: () => void;
+  child?: boolean;
 }) {
   const { t } = useI18n();
   const [pairCode, setPairCode] = useState(initialCode ?? "");
-  const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const submitting = useRef(false);
 
-  const ready = pairCode.length === 6 && /^\d{4,8}$/.test(pin) && !busy;
+  const ready = parsePairCode(pairCode) !== null && !busy;
 
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!ready) return;
+  const restore = async (code: string) => {
+    if (submitting.current || !parsePairCode(code)) return;
+    submitting.current = true;
     setBusy(true);
     setError(null);
     try {
-      await onRestore(pairCode, pin);
+      await onRestore(code);
     } catch (cause) {
-      // The server gives one answer for a wrong code and a wrong PIN alike;
-      // anything else is the network.
-      setError(String(cause).includes("do not match") ? t("pairWrong") : t("pairFailed"));
+      setError(String(cause).includes("not found") ? t("gameCodeWrong") : t("pairFailed"));
+      submitting.current = false;
       setBusy(false);
     }
   };
 
   return (
-    <WelcomeShell>
+    <WelcomeShell top={<LanguagePicker />}>
       <WelcomeCard
         as="form"
-        onSubmit={submit}
+        onSubmit={(event) => { event.preventDefault(); if (ready) void restore(pairCode); }}
         hero={<KeyRound className="size-10 text-primary" aria-hidden />}
         className="space-y-6"
       >
         <div className="text-center">
-          <h1 className="font-display text-3xl font-black">{t("restoreTitle")}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t("restoreBlurb")}</p>
+          <h1 className="font-display text-3xl font-black">{t(child ? "childWelcome" : "restoreTitle")}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{t(child ? "childFirstTime" : "restoreBlurb")}</p>
+          {child && <Link to="/parent?new=1" className={cn(secondaryActionClass, "mt-4 text-sm")}>{t("askParent")}</Link>}
         </div>
+
+        {child && <h2 className="text-center font-bold">{t("childHaveCode")}</h2>}
 
         <div className="space-y-2">
           <label htmlFor="restore-code" className={labelClass}>
@@ -306,23 +312,7 @@ function RestoreForm({
             placeholder="ABC234"
             className={cn(fieldClass, "text-center text-2xl tracking-[0.35em]")}
           />
-          <ScanButton onCode={setPairCode} />
-        </div>
-
-        <div className="space-y-2">
-          <label htmlFor="restore-pin" className={labelClass}>
-            {t("pin")}
-          </label>
-          <input
-            id="restore-pin"
-            value={pin}
-            onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 8))}
-            type="password"
-            inputMode="numeric"
-            autoComplete="current-password"
-            autoFocus={initialCode !== null}
-            className={cn(fieldClass, "text-center tracking-[0.4em]")}
-          />
+          <ScanButton onCode={(code) => { setPairCode(code); void restore(code); }} />
         </div>
 
         {error && (
@@ -340,10 +330,10 @@ function RestoreForm({
         <div className="space-y-1">
           <button type="submit" disabled={!ready} className={cn(primaryActionClass, "disabled:pointer-events-none disabled:opacity-40")}>
             {busy && <Loader2 className="size-5 animate-spin" aria-hidden />}
-            {t("restore")}
+            {t(child ? "startPlaying" : "restore")}
           </button>
           <button type="button" onClick={onCancel} className={cn(ghostActionClass, "text-sm")}>
-            {t("newProfileInstead")}
+            {t(child ? "chooseRoleAgain" : "newProfileInstead")}
           </button>
         </div>
       </WelcomeCard>

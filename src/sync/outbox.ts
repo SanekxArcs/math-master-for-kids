@@ -3,6 +3,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import type { AttemptRecord } from "@/game/useGame";
 import { db, type DeviceIdentity, type OutboxRow } from "./db";
+import { activeProfile, belongsToProfile } from "./profileScope";
 
 /** Server-side batch cap, kept well under Convex's per-mutation write limits. */
 const BATCH = 50;
@@ -10,19 +11,19 @@ const BATCH = 50;
 /** Local history we keep after syncing, so the child's recent run is readable offline. */
 const KEEP_SYNCED = 2000;
 
-export async function enqueue(records: AttemptRecord[]): Promise<void> {
+export async function enqueue(records: AttemptRecord[], profileId = activeProfile()): Promise<void> {
   if (records.length === 0) return;
   try {
-    await db.outbox.bulkPut(records.map((record) => ({ ...record, synced: 0 as const })));
+    await db.outbox.bulkPut(records.map((record) => ({ ...record, profileId, synced: 0 as const })));
   } catch {
     // Losing a row to a full or blocked IndexedDB is bad, but blocking the next
     // question on it would be worse.
   }
 }
 
-export async function pendingCount(): Promise<number> {
+export async function pendingCount(profileId = activeProfile()): Promise<number> {
   try {
-    return await db.outbox.where("synced").equals(0).count();
+    return await db.outbox.where("synced").equals(0).filter((row) => belongsToProfile(row, profileId)).count();
   } catch {
     return 0;
   }
@@ -47,12 +48,13 @@ export async function flush(
     const rows: OutboxRow[] = await db.outbox
       .where("synced")
       .equals(0)
+      .filter((row) => belongsToProfile(row, identity.profileId))
       .limit(BATCH)
       .toArray();
 
     if (rows.length === 0) break;
 
-    const records = rows.map(({ synced: _synced, ...record }) => record);
+    const records = rows.map(({ synced: _synced, profileId: _profile, ...record }) => record);
     const result = await client.mutation(api.attempts.record, {
       profileId: identity.profileId as Id<"profiles">,
       deviceToken: identity.deviceToken,
@@ -63,7 +65,7 @@ export async function flush(
     // stop: retrying a batch the server will keep refusing, every thirty
     // seconds forever, helps nobody.
     if (result.unlinked) {
-      return { sent, remaining: await pendingCount(), unlinked: true };
+      return { sent, remaining: await pendingCount(identity.profileId), unlinked: true };
     }
 
     await db.outbox.bulkPut(rows.map((row) => ({ ...row, synced: 1 as const })));
@@ -72,26 +74,26 @@ export async function flush(
     if (rows.length < BATCH) break;
   }
 
-  await prune();
-  return { sent, remaining: await pendingCount(), unlinked: false };
+  await prune(identity.profileId);
+  return { sent, remaining: await pendingCount(identity.profileId), unlinked: false };
 }
 
 /** Keeps the local mirror from growing without bound on a long-lived tablet. */
-async function prune(): Promise<void> {
+async function prune(profileId: string): Promise<void> {
   try {
-    const syncedCount = await db.outbox.where("synced").equals(1).count();
+    const syncedCount = await db.outbox.where("synced").equals(1).filter((row) => belongsToProfile(row, profileId)).count();
     if (syncedCount <= KEEP_SYNCED) return;
 
     const excess = await db.outbox
       .where("synced")
       .equals(1)
-      .limit(syncedCount - KEEP_SYNCED)
+      .filter((row) => belongsToProfile(row, profileId))
       .toArray();
 
     // Oldest first, so pruning removes history the parent is least likely to
     // be looking at.
     excess.sort((a, b) => a.createdAt - b.createdAt);
-    await db.outbox.bulkDelete(excess.map((row) => row.clientId));
+    await db.outbox.bulkDelete(excess.slice(0, syncedCount - KEEP_SYNCED).map((row) => row.clientId));
   } catch {
     /* pruning is best-effort */
   }

@@ -14,6 +14,7 @@ import {
   type DeviceIdentity,
 } from "./db";
 import { enqueue, flush, pendingCount } from "./outbox";
+import { activeProfile } from "./profileScope";
 
 /** `undefined` while IndexedDB is still being read, `null` when unclaimed. */
 export type IdentityState = DeviceIdentity | null | undefined;
@@ -67,13 +68,13 @@ export function useDeviceIdentity() {
   );
 
   /**
-   * Puts an existing profile on this device with the pairing code and PIN —
+   * Puts an existing profile on this device with the child's game code —
    * the way back after site data is cleared, or onto a second tablet.
    */
-  const link = useCallback(async (pairCode: string, pin: string) => {
+  const link = useCallback(async (pairCode: string) => {
     if (!convex) throw new Error("No backend configured");
 
-    const linked = await convex.action(api.secure.linkDevice, { pairCode, pin });
+    const linked = await convex.action(api.secure.linkChildDevice, { pairCode });
     const next: DeviceIdentity = {
       profileId: linked.profileId,
       deviceToken: linked.deviceToken,
@@ -106,10 +107,12 @@ export function useSyncedSettings(identity: IdentityState): {
   const [locale, setLocale] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     void getSettingsMirror<GameSettings>().then((mirrored) => {
-      if (mirrored) setSettings((current) => ({ ...current, ...mirrored }));
+      if (!cancelled && mirrored) setSettings({ ...DEFAULT_SETTINGS, ...mirrored });
     });
-  }, []);
+    return () => { cancelled = true; };
+  }, [identity?.profileId]);
 
   const remote = useQuery(
     api.attempts.settingsForDevice,
@@ -201,11 +204,11 @@ export function useOutboxSync(identity: IdentityState) {
 
   const record = useCallback(
     async (records: AttemptRecord[]) => {
-      await enqueue(records);
+      await enqueue(records, identity?.profileId ?? activeProfile());
       setStatus((s) => ({ ...s, pending: s.pending + records.length }));
       void drain();
     },
-    [drain],
+    [drain, identity?.profileId],
   );
 
   useEffect(() => {

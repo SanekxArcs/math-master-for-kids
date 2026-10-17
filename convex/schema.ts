@@ -106,6 +106,11 @@ export const progressFields = {
   /** What the child is saving up for. Optional for rows from before wishes. */
   wish: v.optional(v.union(v.object({ petId: species, itemId: v.string() }), v.null())),
   level: v.number(),
+  /** Added to complete the portable save; optional for existing snapshots. */
+  asleepSince: v.optional(v.union(v.number(), v.null())),
+  session: v.optional(v.union(v.string(), v.null())),
+  lostFrom: v.optional(v.union(v.number(), v.null())),
+  onboarded: v.optional(v.boolean()),
 };
 
 export default defineSchema({
@@ -146,6 +151,8 @@ export default defineSchema({
     profileId: v.id("profiles"),
     ...progressFields,
     updatedAt: v.number(),
+    /** Server-owned revision for compare-and-save; absent on legacy rows. */
+    revision: v.optional(v.number()),
   }).index("by_profile", ["profileId"]),
 
   settings: defineTable({

@@ -3,8 +3,9 @@ import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { convex } from "@/lib/convex";
 import type { TranslationKey } from "@/i18n/translations";
+import { PARENT_LOCK_EVENT, PARENT_SESSION_KEY } from "@/sync/parentAccess";
 
-const KEY = "math_master_parent_session";
+const KEY = PARENT_SESSION_KEY;
 
 export interface ParentSession {
   token: string;
@@ -15,7 +16,7 @@ export interface ParentSession {
 
 function read(): ParentSession | null {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = sessionStorage.getItem(KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as ParentSession;
     // Drop an obviously expired session client-side too, so the dashboard shows
@@ -35,9 +36,25 @@ export function useParentSession() {
   const logoutMutation = useMutation(api.parent.logout);
 
   useEffect(() => {
+    const lock = () => setSession(null);
+    const onStorage = (event: StorageEvent) => {
+      if (event.storageArea === sessionStorage && ((event.key === KEY && event.newValue === null) || event.key === null)) lock();
+    };
+    const check = () => setSession((current) => current && read()?.token !== current.token ? null : current);
+    window.addEventListener(PARENT_LOCK_EVENT, lock);
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("pageshow", check);
+    window.addEventListener("focus", check);
+    return () => {
+      window.removeEventListener(PARENT_LOCK_EVENT, lock); window.removeEventListener("storage", onStorage);
+      window.removeEventListener("pageshow", check); window.removeEventListener("focus", check);
+    };
+  }, []);
+
+  useEffect(() => {
     try {
-      if (session) localStorage.setItem(KEY, JSON.stringify(session));
-      else localStorage.removeItem(KEY);
+      if (session) sessionStorage.setItem(KEY, JSON.stringify(session));
+      else sessionStorage.removeItem(KEY);
     } catch {
       /* private mode — the session just will not survive a reload */
     }

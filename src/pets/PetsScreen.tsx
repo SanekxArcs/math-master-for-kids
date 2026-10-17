@@ -196,7 +196,7 @@ export function PetsScreen() {
         {/* The same raised centre button as in the game, now saying "play":
             the way back is the button that brought the child here. */}
         <Link
-          to="/"
+          to="/play"
           aria-label={session ? t("keepPlaying") : t("backToGame")}
           className="col-start-2 -my-5 flex size-18 items-center justify-center justify-self-center rounded-full border-b-4 border-black/15 bg-linear-to-b from-primary to-primary/80 text-primary-foreground shadow-[0_8px_18px_-6px_var(--primary)] ring-4 ring-card transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0.5 active:scale-95 active:border-b-2 focus-visible:ring-ring focus-visible:outline-none"
         >
@@ -234,7 +234,7 @@ function PausedGame({ score }: { score: Parameters<typeof SessionStats>[0]["scor
       <SessionStats score={score} className="mt-3" />
       <button
         type="button"
-        onClick={() => navigate("/", { state: { finishToday: true } })}
+        onClick={() => navigate("/play", { state: { finishToday: true } })}
         className={cn(ghostActionClass, "mt-1 py-2")}
       >
         <Moon className="size-4" aria-hidden />

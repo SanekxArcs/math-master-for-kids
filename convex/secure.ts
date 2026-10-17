@@ -215,3 +215,23 @@ export const linkDevice = action({
     return { profileId: profile._id, pairCode: profile.pairCode, deviceToken, name: profile.name };
   },
 });
+
+/** The shared game code grants child/device access, never a parent session. */
+export const linkChildDevice = action({
+  args: { pairCode: v.string() },
+  handler: async (ctx, { pairCode }): Promise<{
+    profileId: Id<"profiles">; pairCode: string; deviceToken: string; name: string;
+  }> => {
+    const code = pairCode.trim().toUpperCase();
+    if (!/^[ABCDEFGHJKLMNPQRTUVWXYZ2346789]{6}$/.test(code)) {
+      throw new ConvexError("That game code was not found");
+    }
+    const profile = await ctx.runQuery(internal.profiles.findByPairCode, { pairCode: code });
+    if (!profile) throw new ConvexError("That game code was not found");
+    const deviceToken = generateToken();
+    await ctx.runMutation(internal.profiles.addDevice, {
+      profileId: profile._id, tokenHash: sha256(deviceToken),
+    });
+    return { profileId: profile._id, pairCode: profile.pairCode, deviceToken, name: profile.name };
+  },
+});

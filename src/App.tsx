@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { PlayRoute } from "@/game/PlayRoute";
 import { PairLanding } from "@/pair/PairLanding";
+import { StartScreen } from "@/game/StartScreen";
 
 /**
  * The dashboard is loaded on demand, and deliberately so.
@@ -25,7 +26,8 @@ const AdminRoute = lazy(() =>
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<PlayRoute />} />
+      <Route path="/" element={<StartScreen />} />
+      <Route path="/play" element={<PlayRoute />} />
       {/* Eager, unlike the dashboard: the child opens it every day. */}
       <Route path="/pets" element={<PlayRoute view="pets" />} />
       <Route path="/horse" element={<Navigate to="/pets" replace />} />
