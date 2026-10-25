@@ -50,6 +50,40 @@ describe("useProgressSync", () => {
     vi.useRealTimers();
   });
 
+  it("manually uploads the current snapshot even when already backed up, with its base revision", async () => {
+    remote.value = { ...backup(), revision: 7 };
+    const hook = renderHook(() => useProgressSync(identity));
+    expect(hook.result.current.pending).toBe(false);
+    await act(async () => { await hook.result.current.saveNow?.(); });
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ baseRevision: 7, progress: expect.objectContaining({ coins: 77, level: 3 }) }));
+    expect(hook.result.current.failed).toBe(false);
+    expect(hook.result.current.saving).toBe(false);
+  });
+
+  it("does not send duplicate manual saves while a request is in flight", async () => {
+    remote.value = { ...backup(), revision: 7 };
+    let complete!: (value: unknown) => void;
+    save.mockImplementationOnce(() => new Promise((resolve) => { complete = resolve; }));
+    const hook = renderHook(() => useProgressSync(identity));
+    let request: Promise<void> | undefined;
+    act(() => { request = hook.result.current.saveNow?.(); });
+    expect(hook.result.current.saving).toBe(true);
+    await act(async () => { await hook.result.current.saveNow?.(); });
+    expect(save).toHaveBeenCalledTimes(1);
+    await act(async () => { complete({ status: "ok", applied: true, revision: 8 }); await request; });
+    expect(hook.result.current.saving).toBe(false);
+  });
+
+  it("keeps manual saving behind conflict protection", async () => {
+    remote.value = { ...backup(), revision: 7 };
+    const hook = renderHook(() => useProgressSync(identity));
+    save.mockResolvedValueOnce({ status: "conflict", progress: backup().progress, revision: 8 });
+    await act(async () => { await hook.result.current.saveNow?.(); });
+    expect(hook.result.current.conflict?.revision).toBe(8);
+    expect(hook.result.current.saveNow).toBeNull();
+    expect(local().coins).toBe(77);
+  });
+
   it("restores a newer backup onto a fresh device, level included", () => {
     remote.value = backup();
     renderHook(() => useProgressSync(identity));
@@ -57,6 +91,25 @@ describe("useProgressSync", () => {
     expect(local().coins).toBe(77);
     expect(local().pets[0]?.name).toBe("Bella");
     expect(readLevel()).toBe(3);
+  });
+
+  it("restores permanent prestige and includes it in the next upload", async () => {
+    remote.value = { ...backup(), progress: { ...backup().progress, prestigeLevels: 27 } };
+    renderHook(() => useProgressSync(identity));
+    expect(local().prestigeLevels).toBe(27);
+    act(() => updateStable((stable) => ({ ...stable, coins: 99 })));
+    await act(async () => vi.advanceTimersByTime(1000));
+    expect(save.mock.calls.at(-1)?.[0]).toMatchObject({ progress: { prestigeLevels: 27 } });
+  });
+
+  it("restores the favorite independently from the pet being viewed and backs it up", async () => {
+    const pets = [newPet("horse", "Bella", T0), newPet("cat", "Rudy", T0)];
+    remote.value = { ...backup(), progress: { ...backup().progress, pets, activeId: "horse", favoriteId: "cat" } };
+    renderHook(() => useProgressSync(identity));
+    expect(local()).toMatchObject({ activeId: "horse", favoriteId: "cat" });
+    act(() => updateStable((stable) => ({ ...stable, coins: 99 })));
+    await act(async () => vi.advanceTimersByTime(1000));
+    expect(save.mock.calls.at(-1)?.[0]).toMatchObject({ progress: { activeId: "horse", favoriteId: "cat" } });
   });
 
   it("sends nothing before the backup has been read", () => {
@@ -126,7 +179,7 @@ describe("useProgressSync", () => {
       { ...newPet("bunny", "Bunny", T0), alive: false, diedAt: T0 },
       newPet("unicorn", "Unicorn", T0), newPet("tiger", "Tiger", T0),
     ];
-    const stable: Stable = { ...NEW_STABLE, coins: 99, pets, activeId: "cat", savedAt: T0,
+    const stable: Stable = { ...NEW_STABLE, coins: 99, pets, activeId: "cat", favoriteId: "dog", savedAt: T0,
       asleepSince: T0, lastBonusDay: "2026-09-25", wish: { petId: "cat", itemId: wish.id } };
     const session = { score: { rawPoints: 100, goodStreak: 4, badStreak: 0, bestStreak: 4, correct: 10, wrong: 1 },
       won: true, lost: false, stopped: false, halfHalfReadyAt: T0 + 3000, question: null,

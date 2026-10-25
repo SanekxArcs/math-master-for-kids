@@ -7,6 +7,7 @@ import { readStable } from "@/game/useStable";
 import { currentLevel } from "@/game/useLocalLevel";
 import type { DeviceIdentity } from "./db";
 import { useProgressSync } from "./useProgressSync";
+import { BackupControl } from "./BackupButton";
 
 /** Long enough not to hammer a server that is down, short enough to catch a deploy. */
 const RETRY_MS = 60_000;
@@ -43,15 +44,15 @@ class QuietBoundary extends Component<{ children: ReactNode; fallback?: ReactNod
   }
 }
 
-type BackupState = Pick<ReturnType<typeof useProgressSync>, "ready" | "restoredVersion" | "pending" | "failed"> & { blocked: boolean };
+type BackupState = Pick<ReturnType<typeof useProgressSync>, "ready" | "restoredVersion" | "pending" | "failed" | "saving" | "saveNow"> & { blocked: boolean };
 
 function Sync({ identity, onChange }: { identity: DeviceIdentity; onChange: (state: BackupState) => void }) {
   const state = useProgressSync(identity);
   const { t } = useI18n();
-  const { ready, restoredVersion, pending, failed } = state;
+  const { ready, restoredVersion, pending, failed, saving, saveNow } = state;
   useEffect(() => {
-    onChange({ ready, restoredVersion, pending, failed, blocked: !!state.conflict });
-  }, [ready, restoredVersion, pending, failed, state.conflict, onChange]);
+    onChange({ ready, restoredVersion, pending, failed, saving, saveNow, blocked: !!state.conflict });
+  }, [ready, restoredVersion, pending, failed, saving, saveNow, state.conflict, onChange]);
   return state.conflict ? createPortal(<Backdrop><GameDialog hero={<CloudDownload className="size-10" />}>
     <h2 className="font-display text-2xl font-black">{t("saveConflictTitle")}</h2>
     <p className="my-4 text-sm text-muted-foreground">{t("saveConflictBody")}</p>
@@ -71,19 +72,25 @@ export function BackupSync({ identity, children }: { identity: DeviceIdentity; c
 
 function BackupForProfile({ identity, children }: { identity: DeviceIdentity; children?: ReactNode }) {
   const { t } = useI18n();
-  const [state, setState] = useState<BackupState>({ ready: false, restoredVersion: 0, pending: true, failed: false, blocked: false });
+  const [state, setState] = useState<BackupState>({ ready: false, restoredVersion: 0, pending: true, failed: false, blocked: false, saving: false, saveNow: null });
+  const [retryVersion, setRetryVersion] = useState(0);
   const onChange = useCallback((next: BackupState) => {
     setState((current) => ({ ...next, ready: current.ready || next.ready,
       restoredVersion: next.restoredVersion || current.restoredVersion }));
   }, []);
   const { ready, restoredVersion, pending, failed } = state;
-  return <>
-    <QuietBoundary fallback={<BackupUnavailable onChange={onChange} />}>
+  const retryNow = () => {
+    if (state.saveNow) { void state.saveNow(); return; }
+    // Retry only the backup boundary. The game and its current answer stay mounted.
+    setRetryVersion((version) => version + 1);
+  };
+  return <BackupControl.Provider value={{ save: retryNow, saving: state.saving, failed, pending }}>
+    <QuietBoundary key={retryVersion} fallback={<BackupUnavailable onChange={onChange} />}>
       <Sync identity={identity} onChange={onChange} />
     </QuietBoundary>
     {ready && !state.blocked ? <>
     <span role="status" className="fixed left-1/2 top-1 z-50 -translate-x-1/2 rounded-full bg-background/95 px-3 py-1 text-[10px] font-bold text-muted-foreground shadow-sm">
-      {t(failed ? "backupFailed" : pending ? "backupPending" : "backupSaved")}
+      {t(state.saving ? "backupSaving" : failed ? "backupFailed" : pending ? "backupPending" : "backupSaved")}
     </span>
     <Fragment key={restoredVersion}>{children}</Fragment>
   </> : (
@@ -94,13 +101,13 @@ function BackupForProfile({ identity, children }: { identity: DeviceIdentity; ch
       </div>
     </main>
   )}
-  </>;
+  </BackupControl.Provider>;
 }
 
 function BackupUnavailable({ onChange }: { onChange: (state: BackupState) => void }) {
   const { t } = useI18n();
   useEffect(() => {
-    onChange({ ready: readStable().savedAt > 0, restoredVersion: 0, pending: true, failed: true, blocked: false });
+    onChange({ ready: readStable().savedAt > 0, restoredVersion: 0, pending: true, failed: true, blocked: false, saving: false, saveNow: null });
   }, [onChange]);
   return <p role="alert" className="bg-muted p-3 text-center text-sm">{t("backupFailed")}</p>;
 }

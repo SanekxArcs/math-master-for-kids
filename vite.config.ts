@@ -40,10 +40,10 @@ export default defineConfig({
         // actually opens it — then kept, because the second visit is usually
         // from the same laptop.
         // The admin page likewise: only the owner ever opens it.
-        globIgnores: ["**/parent-*.js", "**/admin-*.js"],
+        globIgnores: ["**/ParentRoute-*.js", "**/AdminRoute-*.js"],
         runtimeCaching: [
           {
-            urlPattern: /\/assets\/parent-[^/]+\.js$/,
+            urlPattern: /\/assets\/(ParentRoute|AdminRoute)-[^/]+\.js$/,
             handler: "StaleWhileRevalidate",
             options: { cacheName: "parent-dashboard" },
           },
@@ -64,18 +64,16 @@ export default defineConfig({
          * One 730 KiB bundle meant every push to the game re-sent React,
          * Convex and the animation runtime with it. These three barely change
          * between releases, so as their own chunks they stay in the browser
-         * cache and on the CDN edge across deploys — and the dashboard's chunk
-         * is never sent to a child's tablet at all.
+         * cache across deploys. Route modules use automatic splitting: putting
+         * them in manual chunks also dragged their shared dependencies into
+         * those chunks, forcing the tablet to download both dashboards.
          */
         manualChunks(id: string) {
-          if (id.includes("/src/parent/")) return "parent";
-          // A stable name, so the precache can leave the owner's page out.
-          if (id.includes("/src/admin/")) return "admin";
           if (!id.includes("node_modules")) return undefined;
           if (/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(id))
             return "react";
           if (id.includes("node_modules/convex")) return "convex";
-          if (id.includes("node_modules/motion")) return "motion";
+          if (/node_modules\/(motion|framer-motion|motion-dom|motion-utils)\//.test(id)) return "motion";
           return undefined;
         },
       },

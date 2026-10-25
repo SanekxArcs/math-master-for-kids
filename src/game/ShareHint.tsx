@@ -1,5 +1,5 @@
 import { useId } from "react";
-import { LayoutGroup, motion } from "motion/react";
+import { LayoutGroup, motion } from "@/lib/motion";
 import type { HintModel } from "@/engine";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n/useI18n";

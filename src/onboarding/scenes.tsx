@@ -1,4 +1,4 @@
-import { motion, type MotionStyle } from "motion/react";
+import { motion, type MotionStyle } from "@/lib/motion";
 import {
   Eye,
   Flame,

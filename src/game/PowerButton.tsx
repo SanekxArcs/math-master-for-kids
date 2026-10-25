@@ -1,4 +1,4 @@
-import { motion } from "motion/react";
+import { motion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 interface PowerButtonProps {

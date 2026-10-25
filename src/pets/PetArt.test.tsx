@@ -29,6 +29,22 @@ describe("PetArt", () => {
     expect(moving?.classList.contains("pet--still")).toBe(false);
   });
 
+  it("keeps each horse's shading local when an avatar and scene share the page", () => {
+    const art = render(<><PetArt species="horse" /><PetArt species="horse" animated /></>).container;
+    const horses = Array.from(art.querySelectorAll("svg"));
+    const ids = Array.from(art.querySelectorAll("[id]")).map((part) => part.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const horse of horses) {
+      const ownIds = new Set(Array.from(horse.querySelectorAll("[id]")).map((part) => part.id));
+      const fills = Array.from(horse.querySelectorAll('[fill^="url(#"]'));
+      expect(fills.length).toBeGreaterThan(0);
+      for (const part of fills) {
+        const id = part.getAttribute("fill")!.slice(5, -1);
+        expect(ownIds.has(id)).toBe(true);
+      }
+    }
+  });
+
   it.each(SPECIES_ORDER)("gives the %s one mud splat per quarter of cleanliness lost, never more than four", (species) => {
     const splats = (mud: number) =>
       render(<PetArt species={species} mud={mud} />).container.querySelectorAll('path[fill="#6b4423"]').length;

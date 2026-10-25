@@ -1,4 +1,5 @@
-import { motion, useReducedMotion } from "motion/react";
+import { MotionSetting } from "@/components/MotionSetting";
+import { motion, useReducedMotion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -15,6 +16,7 @@ export function WelcomeShell({ children, top }: { children: React.ReactNode; top
         <Brand />
         {top}
         {children}
+        <MotionSetting />
       </div>
     </main>
   );
@@ -59,9 +61,9 @@ export function Backdrop() {
   const reduce = useReducedMotion();
   return (
     <div className="pointer-events-none absolute inset-0" aria-hidden>
-      <span className="absolute -left-24 -top-24 size-80 rounded-full bg-primary/20 blur-3xl" />
-      <span className="absolute -right-24 top-1/3 size-72 rounded-full bg-(--option-3)/20 blur-3xl" />
-      <span className="absolute -bottom-24 left-1/4 size-80 rounded-full bg-(--option-0)/20 blur-3xl" />
+      <span className="absolute -left-24 -top-24 size-80 rounded-full" style={{ background: "radial-gradient(circle, var(--primary), transparent 70%)", opacity: 0.2 }} />
+      <span className="absolute -right-24 top-1/3 size-72 rounded-full" style={{ background: "radial-gradient(circle, var(--option-3), transparent 70%)", opacity: 0.2 }} />
+      <span className="absolute -bottom-24 left-1/4 size-80 rounded-full" style={{ background: "radial-gradient(circle, var(--option-0), transparent 70%)", opacity: 0.2 }} />
       {SYMBOLS.map((symbol) => (
         <motion.span
           key={symbol.char + symbol.left}

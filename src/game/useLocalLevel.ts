@@ -1,6 +1,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { touchStable } from "./useStable";
 import { activeProfile, profileKey } from "@/sync/profileScope";
+import { MAX_LEVEL } from "@/engine/level";
 
 const KEY = "math_master_level";
 
@@ -19,7 +20,7 @@ export function readLevel(): number {
     const raw = localStorage.getItem(profileKey(KEY));
     if (!raw) return 1;
     const parsed = Number.parseInt(raw, 10);
-    return Number.isFinite(parsed) && parsed >= 1 ? parsed : 1;
+    return Number.isFinite(parsed) && parsed >= 1 ? Math.min(MAX_LEVEL, parsed) : 1;
   } catch {
     return 1;
   }
@@ -62,6 +63,8 @@ function subscribe(listener: () => void) {
  * Moves the level up to at least `level`, never down: the "next level" button.
  */
 export function raiseLevel(level: number): void {
+  if (!Number.isFinite(level)) return;
+  level = Math.min(MAX_LEVEL, level);
   if (level <= getSnapshot()) return;
   write(level);
   touchStable();
@@ -74,7 +77,7 @@ export function currentLevel(): number {
 
 /** Sets the level outright, up or down — for a backup newer than this device. */
 export function setLevel(level: number): void {
-  const next = Math.max(1, Math.floor(level));
+  const next = Number.isFinite(level) ? Math.min(MAX_LEVEL, Math.max(1, Math.floor(level))) : 1;
   if (next === getSnapshot()) return;
   write(next);
 }

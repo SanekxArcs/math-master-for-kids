@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion } from "motion/react";
+import { motion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { pairUrl } from "./pairLink";
 

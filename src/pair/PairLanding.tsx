@@ -1,5 +1,5 @@
 import { Link, Navigate, useSearchParams } from "react-router-dom";
-import { motion, type MotionStyle } from "motion/react";
+import { motion, type MotionStyle } from "@/lib/motion";
 import { Gamepad2, LineChart, Link2 } from "lucide-react";
 import { convex } from "@/lib/convex";
 import { cn } from "@/lib/utils";

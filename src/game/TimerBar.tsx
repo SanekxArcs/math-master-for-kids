@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 interface TimerBarProps {
@@ -10,15 +10,14 @@ interface TimerBarProps {
 }
 
 /**
- * Driven by requestAnimationFrame rather than a 50ms interval fighting a CSS
- * transition, so the bar tracks the real deadline instead of drifting behind it.
+ * Ten updates per second, using the real deadline so a busy tablet cannot
+ * make the countdown drift. Transform avoids laying out the bar each tick.
  *
  * Calm, then warm, then urgent: the colour tells the child how much time is
  * left without them having to judge a bar's length mid-sum.
  */
 export function TimerBar({ askedAt, seconds, running, className }: TimerBarProps) {
   const [fraction, setFraction] = useState(1);
-  const frame = useRef(0);
 
   useEffect(() => {
     if (!running) return;
@@ -26,12 +25,13 @@ export function TimerBar({ askedAt, seconds, running, className }: TimerBarProps
     const total = seconds * 1000;
     const tick = () => {
       const remaining = Math.max(0, askedAt + total - Date.now());
-      setFraction(remaining / total);
-      if (remaining > 0) frame.current = requestAnimationFrame(tick);
+      setFraction(total > 0 ? Math.min(1, remaining / total) : 0);
+      if (remaining <= 0) window.clearInterval(timer);
     };
-    frame.current = requestAnimationFrame(tick);
+    const timer = window.setInterval(tick, 100);
+    tick();
 
-    return () => cancelAnimationFrame(frame.current);
+    return () => window.clearInterval(timer);
   }, [askedAt, seconds, running]);
 
   const urgent = fraction < 0.25;
@@ -48,7 +48,7 @@ export function TimerBar({ askedAt, seconds, running, className }: TimerBarProps
           "h-full rounded-r-full transition-colors duration-500",
           urgent ? "bg-wrong animate-pulse" : warm ? "bg-combo" : "bg-primary",
         )}
-        style={{ width: `${Math.max(0, fraction * 100)}%` }}
+        style={{ transform: `scaleX(${Math.max(0, fraction)})`, transformOrigin: "left" }}
       />
     </div>
   );

@@ -1,9 +1,10 @@
-import { StrictMode } from "react";
+import { StrictMode, useLayoutEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { ConvexProvider } from "convex/react";
-import { MotionConfig } from "motion/react";
+import { MotionConfig } from "@/lib/motion";
 import "@fontsource-variable/nunito";
+import { useReducedMotion } from "@/lib/motionPreference";
 import App from "./App.tsx";
 import { convex } from "./lib/convex.ts";
 import { I18nProvider } from "./i18n/useI18n.tsx";
@@ -19,18 +20,24 @@ darkQuery?.addEventListener?.("change", applyScheme);
 const root = document.getElementById("root");
 if (!root) throw new Error("Root element #root is missing from index.html");
 
-// reducedMotion="user": the CSS media query cannot reach motion's JS
-// animations, so this is what stills the looping ones for a child whose
-// device asks for less motion.
+// Keep CSS and JavaScript motion in step with the device preference.
+function MotionPreferences({ children }: { children: React.ReactNode }) {
+  const reduced = useReducedMotion();
+  useLayoutEffect(() => {
+    document.documentElement.classList.toggle("reduce-motion", reduced);
+  }, [reduced]);
+  return <MotionConfig reducedMotion={reduced ? "always" : "never"}>{children}</MotionConfig>;
+}
+
 const tree = (
   <ErrorBoundary>
-    <MotionConfig reducedMotion="user">
+    <MotionPreferences>
       <I18nProvider>
         <BrowserRouter>
           <App />
         </BrowserRouter>
       </I18nProvider>
-    </MotionConfig>
+    </MotionPreferences>
   </ErrorBoundary>
 );
 

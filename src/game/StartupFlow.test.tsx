@@ -71,7 +71,8 @@ describe("child and parent entry paths", () => {
     expect(screen.queryByLabelText("PIN")).toBeNull();
     await user.click(screen.getByRole("button", { name: "Scan test code" }));
     expect(actions.link).toHaveBeenCalledWith("ABC234");
-    expect(await screen.findByRole("dialog", { name: "How to play" })).toBeInTheDocument();
+    // The play screen is loaded on demand; allow its first module load to finish.
+    expect(await screen.findByRole("dialog", { name: "How to play" }, { timeout: 5000 })).toBeInTheDocument();
     expect(actions.claim).not.toHaveBeenCalled();
   });
 

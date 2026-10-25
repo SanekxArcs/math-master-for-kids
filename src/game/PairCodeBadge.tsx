@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion } from "@/lib/motion";
 import { Check, Copy, KeyRound } from "lucide-react";
 import { useI18n } from "@/i18n/useI18n";
 import { cn } from "@/lib/utils";

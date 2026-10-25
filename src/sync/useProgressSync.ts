@@ -27,7 +27,9 @@ export function toBackup(stable: Stable, level: number) {
   } catch { /* storage unavailable */ }
   return {
     coins: stable.coins, lastBonusDay: stable.lastBonusDay, pets: stable.pets.map(toPet),
+    prestigeLevels: stable.prestigeLevels ?? 0,
     activeId: stable.activeId, savedAt: stable.savedAt,
+    favoriteId: stable.favoriteId ?? stable.activeId,
     wish: stable.wish ? { petId: stable.wish.petId, itemId: stable.wish.itemId } : null,
     level, asleepSince: stable.asleepSince,
     session: session ? JSON.stringify(session) : null, lostFrom,
@@ -62,6 +64,7 @@ export function useProgressSync(identity: IdentityState) {
   const [ready, setReady] = useState(false);
   const [restoredVersion, setRestoredVersion] = useState(0);
   const [failed, setFailed] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [conflict, setConflict] = useState<Remote | null>(null);
   const [base, setBase] = useState<BackupBase | null>(readBackupBase);
   const initialized = useRef(false);
@@ -107,6 +110,8 @@ export function useProgressSync(identity: IdentityState) {
     const sameLegacySave = revision === 0 && local.savedAt === remote.progress.savedAt &&
       currentLevel() === remote.progress.level && local.coins === legacyStable.coins &&
       local.lastBonusDay === legacyStable.lastBonusDay && local.activeId === legacyStable.activeId &&
+      (local.favoriteId ?? local.activeId) === (legacyStable.favoriteId ?? legacyStable.activeId) &&
+      (local.prestigeLevels ?? 0) === (legacyStable.prestigeLevels ?? 0) &&
       JSON.stringify(local.pets) === JSON.stringify(legacyStable.pets) &&
       JSON.stringify(local.wish) === JSON.stringify(legacyStable.wish) &&
       (remote.progress.asleepSince === undefined || local.asleepSince === legacyStable.asleepSince) &&
@@ -130,12 +135,14 @@ export function useProgressSync(identity: IdentityState) {
     }
   }, [remote, remember, restore]);
 
-  const push = useCallback(async () => {
+  const push = useCallback(async (force = false) => {
     if (!args || !base || conflict || inFlight.current) return;
     const current = readStable();
-    if (current.savedAt === base.savedAt) return;
+    if (!force && current.savedAt === base.savedAt) return;
     const snapshot = toBackup(current, currentLevel());
     inFlight.current = true;
+    setSaving(true);
+    setFailed(false);
     try {
       const result = await save({ ...args, progress: snapshot, baseRevision: base.revision });
       if (!mounted.current) return;
@@ -146,8 +153,9 @@ export function useProgressSync(identity: IdentityState) {
         setFailed(false);
       } else setFailed(true);
     } catch { if (mounted.current) setFailed(true); }
-    finally { inFlight.current = false; }
+    finally { inFlight.current = false; if (mounted.current) setSaving(false); }
   }, [args?.profileId, args?.deviceToken, base, conflict, save, remember]);
+  const saveNow = useCallback(() => push(true), [push]);
 
   useEffect(() => {
     if (!ready || conflict || !base || stable.savedAt === base.savedAt) return;
@@ -182,7 +190,7 @@ export function useProgressSync(identity: IdentityState) {
       remember({ revision: conflict.revision, savedAt: -1 }); setConflict(null);
     } catch { setFailed(true); }
   };
-  return { ready, restoredVersion, failed,
+  return { ready, restoredVersion, failed, saving, saveNow: base && !conflict ? saveNow : null,
     pending: !base || stable.savedAt !== base.savedAt || conflict !== null,
     conflict, chooseCloud, chooseDevice };
 }

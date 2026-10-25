@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion } from "@/lib/motion";
 import { Play, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n/useI18n";

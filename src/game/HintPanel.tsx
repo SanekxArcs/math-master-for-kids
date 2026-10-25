@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { motion } from "motion/react";
+import { motion } from "@/lib/motion";
 import { Lightbulb, Play, RefreshCw, Square, X } from "lucide-react";
 import type { HintModel, Problem } from "@/engine";
 import { cn } from "@/lib/utils";

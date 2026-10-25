@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "convex/react";
-import { motion } from "motion/react";
+import { motion } from "@/lib/motion";
 import {
   BarChart3,
   CalendarDays,

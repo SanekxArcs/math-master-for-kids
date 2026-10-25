@@ -1,20 +1,23 @@
 import { useEffect, useRef, useState } from "react";
-import { motion } from "motion/react";
-import { Star, TriangleAlert, Trophy } from "lucide-react";
+import { motion } from "@/lib/motion";
+import { Sparkles, Star, TriangleAlert, Trophy } from "lucide-react";
 import { lossLimit, type ScoreState } from "@/engine";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n/useI18n";
-import { CoinCount } from "@/pets/CoinCount";
+import { CoinIcon } from "@/pets/CoinCount";
 import type { SyncStatus } from "@/sync/useSync";
 import { ComboMeter } from "./ComboMeter";
 import { SyncBadge } from "./SyncBadge";
 import { TimerBar } from "./TimerBar";
 import { useCountUp } from "./useCountUp";
+import { multiplierLabel } from "./LevelRewards";
 
 export interface GameHudProps {
   score: ScoreState;
   level: number;
   coins: number;
+  prestigeLevels?: number;
+  onLevelClick?: () => void;
   syncStatus?: SyncStatus | null | undefined;
   /** Points to win the round, or null when the parent turned the goal off. */
   goal: number | null;
@@ -26,16 +29,16 @@ export interface GameHudProps {
  * purse on top, the points and the road to the goal under them, and the clock
  * running along the bottom edge.
  *
- * One panel rather than loose pieces so it reads as a single instrument — the
- * eye learns where each thing lives and stops hunting. Read-only on purpose:
- * everything to tap lives in the bar at the bottom, under the thumb.
+ * The level badge opens reward details; the remaining controls stay in the dock.
  */
-export function GameHud({ score, level, coins, syncStatus, goal, timer }: GameHudProps) {
+export function GameHud({ score, level, coins, prestigeLevels = 0, onLevelClick, syncStatus, goal, timer }: GameHudProps) {
+  const { t, lang } = useI18n();
   // The real total, below zero included: a wrong answer is seen to cost
   // something. Coins are still paid on the floored total, so a bad run can
   // never take coins away.
   const points = score.rawPoints;
   const shown = useCountUp(points);
+  const shownCoins = useCountUp(coins, 900);
   const pulse = useAnswerPulse(score);
 
   return (
@@ -47,12 +50,24 @@ export function GameHud({ score, level, coins, syncStatus, goal, timer }: GameHu
       />
 
       <div className="flex flex-col gap-3 px-4 pb-3 pt-3">
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-          <LevelBadge level={level} className="justify-self-start" />
+        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
+          <LevelBadge level={level} onClick={onLevelClick} className="justify-self-start" />
           <ComboMeter score={score} />
           <div className="flex items-center gap-2 justify-self-end">
             {syncStatus && <SyncBadge status={syncStatus} />}
-            <CoinCount coins={coins} className="text-lg" />
+            <button type="button" onClick={onLevelClick}
+              aria-label={`${coins} ${t("coins", { coins })}. ${t("coinMultiplier", { multiplier: multiplierLabel(prestigeLevels) })}. ${t("levelRewardsTitle")}`}
+              title={t("coinMultiplier", { multiplier: multiplierLabel(prestigeLevels) })}
+              className="inline-flex h-10 max-w-48 items-center gap-2 rounded-full border border-border/70 bg-muted/60 py-1 pl-1 pr-2.5 shadow-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring">
+              <span role="img" aria-label={`${coins} ${t("coins", { coins })}`} className="flex min-w-0 items-center gap-1.5 text-combo-foreground dark:text-combo">
+                <CoinIcon className="size-7 shrink-0" />
+                <span className="truncate font-display text-lg font-black leading-none tabular-nums">{shownCoins.toLocaleString(lang)}</span>
+              </span>
+              <span className="flex shrink-0 items-center gap-1 border-l border-border pl-2 text-primary">
+                <Sparkles className="hidden size-3 shrink-0 min-[400px]:block" aria-hidden="true" />
+                <span className="font-display text-xs font-black tabular-nums">{multiplierLabel(prestigeLevels)}</span>
+              </span>
+            </button>
           </div>
         </div>
 
@@ -72,17 +87,20 @@ export function GameHud({ score, level, coins, syncStatus, goal, timer }: GameHu
   );
 }
 
-function LevelBadge({ level, className }: { level: number; className?: string }) {
+function LevelBadge({ level, onClick, className }: { level: number; onClick?: (() => void) | undefined; className?: string }) {
   const { t } = useI18n();
   return (
-    <motion.div
+    <motion.button
+      type="button"
+      onClick={onClick}
+      aria-label={t("openLevelRewards", { level })}
       // Keyed so a new level lands with a stamp rather than just changing digits.
       key={level}
       initial={{ scale: 0.4, rotate: -14, opacity: 0 }}
       animate={{ scale: 1, rotate: 0, opacity: 1 }}
       transition={{ type: "spring", stiffness: 380, damping: 16 }}
       className={cn(
-        "flex items-center gap-1.5 rounded-full bg-linear-to-b from-primary to-primary/80 py-1 pl-1 pr-3 text-primary-foreground shadow-[0_3px_10px_-3px_var(--primary)]",
+        "flex min-h-10 items-center gap-1.5 rounded-full bg-linear-to-b from-primary to-primary/80 py-1 pl-1 pr-3 text-primary-foreground shadow-[0_3px_10px_-3px_var(--primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring",
         className,
       )}
     >
@@ -92,7 +110,7 @@ function LevelBadge({ level, className }: { level: number; className?: string })
       <span className="whitespace-nowrap font-display text-sm font-black tabular-nums">
         {t("levelShort", { level })}
       </span>
-    </motion.div>
+    </motion.button>
   );
 }
 

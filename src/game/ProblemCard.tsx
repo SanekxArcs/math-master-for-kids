@@ -1,5 +1,5 @@
 import { Fragment, useLayoutEffect, useRef } from "react";
-import { AnimatePresence, motion, useAnimate, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useAnimate, useReducedMotion } from "@/lib/motion";
 import { Check, Clock, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n/useI18n";

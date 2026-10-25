@@ -2,6 +2,24 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Native scrolling stays touch-friendly, with a shared lightweight purple thumb. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklch, var(--primary) 60%, var(--muted)) transparent;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-color: color-mix(in oklch, var(--primary) 60%, var(--muted));
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background-color: var(--primary); }
+::-webkit-scrollbar-corner { background: transparent; }
+.scroll-area { scrollbar-gutter: stable; }
+
 /*
   Kid-facing theme. Deliberately higher chroma and larger radii than the shadcn
   default: the target user is 7 and plays on a tablet held at arm's length.
@@ -391,4 +409,29 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Also stop CSS/SVG loops when the in-app device preference is selected. */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+/* Frosted layers repeatedly sample and blur everything behind the game.
+   Opaque cards keep the same contrast with much less GPU work on tablets. */
+@media (pointer: coarse) {
+  [class*="backdrop-blur"] {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background-color: var(--card);
+  }
+  [class*="backdrop-blur"].bg-scrim { background-color: var(--scrim); }
+}
+
+html.reduce-motion [class*="backdrop-blur"] {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }

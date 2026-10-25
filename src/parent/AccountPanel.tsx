@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation } from "convex/react";
-import { AnimatePresence, motion, type MotionStyle } from "motion/react";
+import { AnimatePresence, motion, type MotionStyle } from "@/lib/motion";
 import { Check, Copy, KeyRound, Loader2, Lock, LogOut, Smartphone, TriangleAlert, UserRound } from "lucide-react";
 import { api } from "@convex/_generated/api";
 import { convex } from "@/lib/convex";

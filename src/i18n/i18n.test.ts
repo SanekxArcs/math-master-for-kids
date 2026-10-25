@@ -111,6 +111,9 @@ describe("translate", () => {
       op: "Adding",
       step: 20,
       joy: 21,
+      multiplier: "1.05×",
+      levels: 5,
+      bonus: 5,
     };
     for (const lang of LANGS) {
       for (const key of KEYS) {

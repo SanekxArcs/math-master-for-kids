@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion } from "motion/react";
+import { motion } from "@/lib/motion";
 import { ArrowLeft, LineChart, Loader2, Lock } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { parsePairCode } from "@/pair/pairLink";

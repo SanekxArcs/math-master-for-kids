@@ -1,4 +1,4 @@
-import { motion, type MotionStyle } from "motion/react";
+import { motion, type MotionStyle } from "@/lib/motion";
 import { Check, Delete } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n/useI18n";

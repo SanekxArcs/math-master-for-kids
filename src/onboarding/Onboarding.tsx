@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion } from "@/lib/motion";
 import { ArrowLeft, ArrowRight, Eye, KeyRound, Play, Scissors, Settings2, X } from "lucide-react";
 import type { GameSettings } from "@/engine";
 import { profileKey } from "@/sync/profileScope";

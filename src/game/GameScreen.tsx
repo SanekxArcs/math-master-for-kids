@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion } from "@/lib/motion";
 import { CircleHelp, Eye, Flag, HeartCrack, Moon, Pause, Play, Settings2, Sun, Trophy } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   displayPoints,
   goalForLevel,
   hasNextLevel,
-  activePet,
+  favoritePet,
   isAsleep,
   petNeedingCare,
   payReward,
   putToSleep,
   sessionReward,
   coinsForLevel,
+  MAX_LEVEL,
+  completedLevels,
   settingsForLevel,
   shownMood,
   wakeUp,
@@ -50,6 +52,11 @@ import { updateStable, useLiveStable, useStable } from "./useStable";
 import type { GameSettings } from "@/engine";
 import type { SyncStatus } from "@/sync/useSync";
 import { profileKey } from "@/sync/profileScope";
+import { MotionSetting } from "@/components/MotionSetting";
+import { BackupButton } from "@/sync/BackupButton";
+import { LevelRewards } from "./LevelRewards";
+import { prestigeRun } from "./prestige";
+import { PetEncouragement } from "./PetEncouragement";
 
 const LOST_FROM = "math_master_lost_from";
 
@@ -95,6 +102,8 @@ export function GameScreen({
   pairCode,
 }: GameScreenProps) {
   const { t } = useI18n();
+  const [rewardsOpen, setRewardsOpen] = useState(false);
+  const rewardsPausedGame = useRef(false);
   /**
    * The question the hint was opened on, not a plain open flag. A flag outlived
    * the question: answer with the picture showing and the next problem arrived
@@ -175,7 +184,7 @@ export function GameScreen({
    * paying it again there would make refreshing a coin machine.
    */
   const stable = useLiveStable(useStable());
-  const shown = activePet(stable);
+  const shown = favoritePet(stable);
   /** The pet the nudges are about: whoever needs care, else whoever is on screen. */
   const needy = petNeedingCare(stable);
   const [reward, setReward] = useState<Reward | null>(null);
@@ -317,6 +326,22 @@ export function GameScreen({
     game.restart();
   };
 
+  const showRewards = (open: boolean) => {
+    if (open) {
+      rewardsPausedGame.current = !state.paused && state.phase !== "finished";
+      if (rewardsPausedGame.current) game.pause();
+    } else if (rewardsPausedGame.current) {
+      rewardsPausedGame.current = false;
+      game.resume();
+    }
+    setRewardsOpen(open);
+  };
+  const prestige = () => {
+    if (!baseSettings.goalEnabled || !prestigeRun()) return;
+    setRewardsOpen(false);
+    game.restart();
+  };
+
   /**
    * Where the right answer was tapped, for its jump into the sum. Tied to the
    * question like the hint, so it can never replay on the next one.
@@ -342,6 +367,8 @@ export function GameScreen({
         score={state.score}
         level={level}
         coins={stable.coins}
+        prestigeLevels={stable.prestigeLevels ?? 0}
+        onLevelClick={() => showRewards(true)}
         syncStatus={syncStatus}
         goal={settings.goalEnabled ? settings.goalTarget : null}
         timer={
@@ -434,7 +461,7 @@ export function GameScreen({
           screen. A child who comes back to the tablet is never dropped
           straight into a running countdown they have not looked at yet. */}
       <AnimatePresence>
-        {state.paused && state.phase !== "finished" && !touring && (
+        {state.paused && state.phase !== "finished" && !touring && !rewardsOpen && (
           <Backdrop>
             <GameDialog hero={<Pause className="size-10" fill="currentColor" strokeWidth={0} aria-hidden />}>
               <DialogTitle>{t("paused")}</DialogTitle>
@@ -459,7 +486,7 @@ export function GameScreen({
       </AnimatePresence>
 
       <AnimatePresence>
-        {state.phase === "finished" && (
+        {state.phase === "finished" && !rewardsOpen && (
           <Backdrop>
             {asleep ? (
               // Bedtime. The pet itself is the badge, fast asleep.
@@ -535,10 +562,8 @@ export function GameScreen({
                 <SessionStats score={state.score} className="mt-5" />
                 {reward && <RewardCard reward={reward} />}
 
-                {/* The next level is offered only for a goal actually reached.
-                    A child who stopped for lunch is not moved up, and neither is
-                    one whose goal is already at the ceiling — a "next level" that
-                    plays to the same target is a promise the game cannot keep. */}
+                {/* Advance only after a win; later levels at the target ceiling
+                    still pay increasing coin rewards, up to level twenty. */}
                 {state.won && canLevelUp ? (
                   <>
                     <button type="button" onClick={startNextLevel} className={cn(primaryActionClass, "mt-6 flex-col gap-0")}>
@@ -548,10 +573,10 @@ export function GameScreen({
                         {/* What the next level pays, so moving up has a visible prize. */}
                         <span
                           className="flex items-center gap-1 rounded-full bg-black/15 py-0.5 pl-0.5 pr-2 text-primary-foreground"
-                          aria-label={`${coinsForLevel(nextGoal, level + 1)} ${t("coins", { coins: coinsForLevel(nextGoal, level + 1) })}`}
+                          aria-label={`${coinsForLevel(nextGoal, level + 1, stable.prestigeLevels)} ${t("coins", { coins: coinsForLevel(nextGoal, level + 1, stable.prestigeLevels) })}`}
                         >
                           <CoinIcon className="size-4" />
-                          <span aria-hidden>{coinsForLevel(nextGoal, level + 1)}</span>
+                          <span aria-hidden>{coinsForLevel(nextGoal, level + 1, stable.prestigeLevels)}</span>
                         </span>
                       </span>
                     </button>
@@ -565,6 +590,9 @@ export function GameScreen({
                   </button>
                 )}
 
+                <button type="button" onClick={() => showRewards(true)} className={cn(secondaryActionClass, "mt-3 py-2 text-sm")}>
+                  {t(state.won && level === MAX_LEVEL ? "prestigeTitle" : "levelRewardsTitle")}
+                </button>
                 <Link
                   to="/pets"
                   className={cn(ghostActionClass, "mt-1", needy && "animate-pulse text-foreground")}
@@ -586,10 +614,10 @@ export function GameScreen({
 
       <AnimatePresence>{touring && <Onboarding settings={settings} onDone={endTour} />}</AnimatePresence>
 
-      <BottomBar className="grid-cols-[1fr_auto_auto_auto_1fr] gap-2 sm:gap-3">
+      <BottomBar className="grid-cols-[1fr_auto_auto_auto_1fr] gap-2 max-[420px]:gap-1 sm:gap-3">
         {/* The grown-up corners: small and quiet, one at each end, well away
             from the buttons a child is meant to use. */}
-        <div className="flex items-center gap-0.5 justify-self-start rounded-full bg-muted/70 p-0.5">
+        <div className="flex items-center gap-0.5 justify-self-start rounded-full bg-muted/70 p-0.5 max-[420px]:flex-col">
           <button
             type="button"
             onClick={() => setTouring(true)}
@@ -628,10 +656,13 @@ export function GameScreen({
             Raised out of the dock like a console's centre button, with the pet
             living in it and a pause badge to say what a tap does. One that
             needs care wiggles, and gets a dot — a nudge that needs no reading. */}
+        <div className="relative -my-5 size-18 justify-self-center">
+        <PetEncouragement outcome={outcome} helped={state.usedHalfHalf || state.usedVisualHint}
+          hidden={state.phase === "finished" || state.paused || touring || rewardsOpen} />
         <Link
           to="/pets"
           aria-label={t("pauseAndPets")}
-          className="relative -my-5 flex size-18 items-center justify-center justify-self-center rounded-full border-b-4 border-black/15 bg-linear-to-b from-secondary to-accent shadow-[0_8px_18px_-6px_var(--primary)] ring-4 ring-card transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0.5 active:scale-95 active:border-b-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="relative flex size-18 items-center justify-center rounded-full border-b-4 border-black/15 bg-linear-to-b from-secondary to-accent shadow-[0_8px_18px_-6px_var(--primary)] ring-4 ring-card transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0.5 active:scale-95 active:border-b-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           <motion.span
             className="flex"
@@ -673,6 +704,7 @@ export function GameScreen({
             </span>
           )}
         </Link>
+        </div>
 
         {settings.visualHintEnabled ? (
           <PowerButton
@@ -687,10 +719,16 @@ export function GameScreen({
           <span className="size-12" aria-hidden />
         )}
 
-        <div className="justify-self-end">
+        <div className="flex items-center gap-0.5 justify-self-end max-[480px]:grid max-[480px]:grid-cols-2">
+          <BackupButton />
           {pairCode && <PairCodeBadge pairCode={pairCode} />}
+          <MotionSetting compact />
         </div>
       </BottomBar>
+      <LevelRewards open={rewardsOpen} onOpenChange={showRewards} level={level} baseGoal={baseSettings.goalTarget}
+        prestigeLevels={stable.prestigeLevels ?? 0} earnedLevels={completedLevels(level, state.won)}
+        canPrestige={baseSettings.goalEnabled && completedLevels(level, state.won) > 0}
+        goalEnabled={baseSettings.goalEnabled} onPrestige={prestige} />
     </main>
   );
 }

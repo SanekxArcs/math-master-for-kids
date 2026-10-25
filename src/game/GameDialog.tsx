@@ -1,4 +1,4 @@
-import { motion } from "motion/react";
+import { motion } from "@/lib/motion";
 import { Check, Flame, Star, Target } from "lucide-react";
 import type { ScoreState } from "@/engine";
 import { cn } from "@/lib/utils";

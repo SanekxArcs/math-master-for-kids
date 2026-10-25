@@ -8,6 +8,7 @@ import { Dog } from "./art/Dog";
 import { Bunny } from "./art/Bunny";
 import { Tiger } from "./art/Tiger";
 import "./pet-art.css";
+import "./horse-art.css";
 
 /**
  * The pets, drawn.

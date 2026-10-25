@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { useReducedMotion } from "motion/react";
+import { useReducedMotion } from "@/lib/motionPreference";
 
 /**
  * A number that rolls up to its target instead of jumping there, so a gain is

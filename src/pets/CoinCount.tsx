@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { motion } from "motion/react";
+import { motion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n/useI18n";
 import { useCountUp } from "@/game/useCountUp";

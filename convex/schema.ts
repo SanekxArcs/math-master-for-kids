@@ -98,9 +98,11 @@ export const petFields = v.object({
 
 export const progressFields = {
   coins: v.number(),
+  prestigeLevels: v.optional(v.number()),
   lastBonusDay: v.union(v.string(), v.null()),
   pets: v.array(petFields),
   activeId: v.union(species, v.null()),
+  favoriteId: v.optional(v.union(species, v.null())),
   /** Device clock of the change this snapshot came from. Newest wins. */
   savedAt: v.number(),
   /** What the child is saving up for. Optional for rows from before wishes. */

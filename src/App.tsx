@@ -1,7 +1,6 @@
 import { Suspense, lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Loader2 } from "lucide-react";
-import { PlayRoute } from "@/game/PlayRoute";
 import { PairLanding } from "@/pair/PairLanding";
 import { StartScreen } from "@/game/StartScreen";
 
@@ -23,13 +22,16 @@ const AdminRoute = lazy(() =>
   import("@/admin/AdminRoute").then((module) => ({ default: module.AdminRoute })),
 );
 
+const PlayRoute = lazy(() =>
+  import("@/game/PlayRoute").then((module) => ({ default: module.PlayRoute })),
+);
+
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<StartScreen />} />
-      <Route path="/play" element={<PlayRoute />} />
-      {/* Eager, unlike the dashboard: the child opens it every day. */}
-      <Route path="/pets" element={<PlayRoute view="pets" />} />
+      <Route path="/play" element={<Suspense fallback={<Loading />}><PlayRoute /></Suspense>} />
+      <Route path="/pets" element={<Suspense fallback={<Loading />}><PlayRoute view="pets" /></Suspense>} />
       <Route path="/horse" element={<Navigate to="/pets" replace />} />
       {/* The owner's page, loaded on demand like the dashboard. */}
       <Route

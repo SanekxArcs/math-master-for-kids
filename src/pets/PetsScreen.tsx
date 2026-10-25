@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion, useAnimate, type MotionStyle } from "motion/react";
-import { Hand, Heart, Moon, PawPrint, Pause, Pencil, Play, Plus, Shirt, ShoppingBasket, Sparkles } from "lucide-react";
+import { MotionSetting } from "@/components/MotionSetting";
+import { BackupButton } from "@/sync/BackupButton";
+import { AnimatePresence, motion, useAnimate, useReducedMotion, type MotionStyle } from "@/lib/motion";
+import { Hand, Heart, Moon, PawPrint, Pause, Pencil, Play, Plus, Shirt, ShoppingBasket, Sparkles, Star } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   NAME_MAX,
@@ -10,6 +12,9 @@ import {
   SPECIES,
   SPECIES_ORDER,
   activePet,
+  favoritePet,
+  makeFavorite,
+  orderedPets,
   adopt,
   buy,
   buyAccessory,
@@ -202,6 +207,7 @@ export function PetsScreen() {
         >
           <Play className="ml-1 size-8" fill="currentColor" strokeWidth={0} aria-hidden />
         </Link>
+        <div className="col-start-3 flex items-center gap-0.5 justify-self-end"><BackupButton /><MotionSetting compact /></div>
       </BottomBar>
     </main>
   );
@@ -322,11 +328,13 @@ function NameField({
  */
 function PetTabs({ stable, active, onAdd }: { stable: Stable; active: Pet; onAdd: () => void }) {
   const { t } = useI18n();
+  const strip = useRef<HTMLElement>(null);
+  useEffect(() => { if (strip.current) strip.current.scrollLeft = 0; }, [stable.favoriteId]);
   const canAddMore = stable.pets.length < SPECIES_ORDER.length;
 
   return (
-    <nav aria-label={t("myPets")} className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 pt-1">
-      {stable.pets.map((pet) => {
+    <nav ref={strip} aria-label={t("myPets")} className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 pt-1">
+      {orderedPets(stable).map((pet) => {
         const on = pet.id === active.id;
         return (
           <motion.button
@@ -347,6 +355,7 @@ function PetTabs({ stable, active, onAdd }: { stable: Stable; active: Pet; onAdd
               <PetArt species={pet.species} worn={pet.worn} className={cn("size-8", !pet.alive && "grayscale")} />
             </span>
             <span className="max-w-24 truncate">{pet.name}</span>
+            {favoritePet(stable)?.id === pet.id && <Star className="size-3.5 shrink-0" fill="currentColor" aria-hidden="true" />}
             {needsCare(pet) && (
               <span className="absolute -right-0.5 -top-0.5 flex size-3.5">
                 <span className="absolute inline-flex size-full animate-ping rounded-full bg-wrong opacity-75" />
@@ -510,6 +519,7 @@ function Stall({
   const [renaming, setRenaming] = useState(false);
   const pressTimer = useRef<number | null>(null);
   const sceneRef = useRef<HTMLDivElement>(null);
+  const reduce = useReducedMotion();
   const [figure, animateFigure] = useAnimate<HTMLButtonElement>();
   const nextId = useRef(0);
 
@@ -554,7 +564,7 @@ function Stall({
    */
   const tapPet = (event: React.PointerEvent) => {
     const n = taps.current++;
-    if (figure.current) void animateFigure(figure.current, TRICKS[n % TRICKS.length]!, { duration: 0.6, ease: "easeOut" });
+    if (!reduce && figure.current) void animateFigure(figure.current, TRICKS[n % TRICKS.length]!, { duration: 0.6, ease: "easeOut" });
 
     const box = sceneRef.current?.getBoundingClientRect();
     const x = box ? ((event.clientX - box.left) / box.width) * 100 : undefined;
@@ -576,7 +586,7 @@ function Stall({
   const catchOne = (worth: number) => {
     caughtRef.current += worth;
     setCaught(caughtRef.current);
-    if (figure.current) void animateFigure(figure.current, { y: [0, -16, 0] }, { duration: 0.35 });
+    if (!reduce && figure.current) void animateFigure(figure.current, { y: [0, -16, 0] }, { duration: 0.35 });
   };
   const endGame = () => {
     updateStable((current) => finishPlay(current, pet.id, caughtRef.current, Date.now()));
@@ -714,6 +724,15 @@ function Stall({
               <Pencil className="size-4" aria-hidden />
             </button>
           </div>
+          <button type="button" aria-pressed={favoritePet(stable)?.id === pet.id}
+            aria-label={t(favoritePet(stable)?.id === pet.id ? "favoritePetSelected" : "makeFavoritePet", { name: pet.name })}
+            title={t("favoritePetHint")}
+            onClick={() => updateStable((current) => makeFavorite(current, pet.id))}
+            className={cn("mx-auto mt-2 flex min-h-10 items-center justify-center gap-1.5 rounded-full border-b-2 border-black/10 px-3 py-1.5 font-display text-xs font-bold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring",
+              favoritePet(stable)?.id === pet.id ? "bg-primary/15 text-primary" : "bg-secondary text-secondary-foreground")}>
+            <Star className="size-4" fill={favoritePet(stable)?.id === pet.id ? "currentColor" : "none"} aria-hidden="true" />
+            {t(favoritePet(stable)?.id === pet.id ? "favoritePetBadge" : "makeFavoritePetShort")}
+          </button>
           {/* What the pet would say, in a speech bubble — urgent ones in red. */}
           <motion.p
             key={mood}

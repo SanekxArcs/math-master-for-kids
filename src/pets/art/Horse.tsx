@@ -18,8 +18,8 @@ import {
 } from "./parts";
 
 /**
- * The horse, side-on and facing right, and the unicorn drawn on the same
- * bones: a pale coat, a rainbow mane and a horn.
+ * The unicorn retains its original palette and rig. The horse has its own
+ * illustration and animation rig, re-exported below for existing consumers.
  */
 
 interface Palette {
@@ -36,19 +36,6 @@ interface Palette {
   mouth: string;
   nostril: string;
 }
-
-const HORSE: Palette = {
-  coat: "#c98348",
-  coatDark: "#a3643a",
-  muzzle: "#efc49d",
-  mane: "#5c3420",
-  strands: ["#7a4a2e", "#7a4a2e", "#7a4a2e"],
-  hoof: "#3d2416",
-  hoofShine: "#6b4a36",
-  marking: "#fbf1e4",
-  mouth: "#6b3a22",
-  nostril: "#8a5436",
-};
 
 const UNICORN: Palette = {
   coat: "#f6f1ff",
@@ -91,9 +78,7 @@ const GLITTER = [
   [120, 24, 1.8],
 ] as const;
 
-export function Horse(props: SpeciesArtProps) {
-  return <HorseLike {...props} palette={HORSE} />;
-}
+export { Horse } from "./HorseArt";
 
 export function Unicorn(props: SpeciesArtProps) {
   return <HorseLike {...props} palette={UNICORN} unicorn />;

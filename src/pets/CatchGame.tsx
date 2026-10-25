@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion } from "@/lib/motion";
 import { PLAY_ROUND_MS, itemsFor, playJoy, type Species } from "@/engine";
 import { useI18n } from "@/i18n/useI18n";
 import { cn } from "@/lib/utils";

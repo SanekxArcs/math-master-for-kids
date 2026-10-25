@@ -1,0 +1,96 @@
+/* The horse rests between gestures. Its feet stay planted; only short reactions hop. */
+.pet-horse .pet-body {
+  animation: horse-breathe 4.6s ease-in-out infinite;
+}
+.pet-horse .pet-head {
+  animation: horse-look 9s ease-in-out infinite;
+}
+.pet-horse .pet-tail {
+  animation: horse-tail 7.8s ease-in-out infinite;
+}
+.pet-horse .pet-eye { animation-duration: 6.2s; }
+.pet-horse .pet-ear { animation-duration: 9.4s; }
+.pet-horse .pet-ear-alt { animation-duration: 11s; animation-delay: -4s; }
+.pet-horse :is(.horse-foreleg, .horse-hindleg, .horse-mouth) { transform-box: view-box; }
+.pet-horse .horse-foreleg { animation: horse-paw 14s ease-in-out infinite; }
+
+.pet-horse.mood-happy .pet-bob { animation: none; }
+.pet-horse.mood-happy .pet-shadow { animation: none; }
+.pet-horse.mood-happy .pet-head { animation: horse-happy-look 7.5s ease-in-out infinite; }
+.pet-horse.mood-happy .pet-tail { animation-duration: 5.8s; }
+.pet-horse.mood-happy .pet-sparkle { animation-duration: 4.2s; }
+
+.pet-horse:is(.mood-sad, .mood-sick) .pet-head { animation: none; transform: rotate(6deg); }
+.pet-horse:is(.mood-sad, .mood-sick) .pet-tail { animation-duration: 12s; }
+.pet-horse.mood-sick .pet-body { animation-duration: 6s; }
+.pet-horse:is(.mood-sad, .mood-sick, .mood-asleep, .mood-gone) .horse-foreleg { animation: none; }
+.pet-horse.mood-hungry .pet-head { animation: horse-sniff 6.5s ease-in-out infinite; }
+.pet-horse.mood-vacation .pet-head { animation: horse-look 11s ease-in-out infinite; }
+.pet-horse.mood-asleep .pet-head { animation: none; transform: rotate(9deg); }
+.pet-horse.mood-asleep .pet-body { animation-duration: 6s; }
+.pet-horse.mood-asleep :is(.pet-tail, .pet-eye, .pet-ear, .pet-ear-alt) { animation: none; }
+.pet-horse.mood-gone :is(.pet-body, .pet-tail, .pet-head, .pet-ear, .pet-ear-alt) { animation: none; }
+
+/* Action selectors stay more specific than the resting moods. */
+.pet-horse.act-eat .pet-head { animation: horse-eat-nod 0.5s ease-in-out 3; }
+.pet-horse.act-eat .horse-mouth { animation: horse-chew 0.28s ease-in-out 5; }
+.pet-horse.act-cheer .pet-bob { animation: horse-cheer 0.75s ease-out 2; }
+.pet-horse.act-cheer .pet-shadow { animation: pet-shadow 0.75s ease-out 2; }
+.pet-horse.act-cheer .horse-foreleg { animation: none; }
+.pet-horse.act-wash .pet-body { animation: horse-wash 0.25s ease-in-out 6; }
+
+/* CSS only: no animation library, per-frame React updates, filters or redraw loop. */
+@keyframes horse-breathe {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(1.009); }
+}
+@keyframes horse-look {
+  0%, 38%, 68%, 100% { transform: rotate(0); }
+  45%, 54% { transform: rotate(-2deg); }
+  61% { transform: rotate(0.7deg); }
+}
+@keyframes horse-happy-look {
+  0%, 52%, 82%, 100% { transform: rotate(0); }
+  60% { transform: rotate(-2.5deg); }
+  67% { transform: rotate(1deg); }
+  74% { transform: rotate(-1.5deg); }
+}
+@keyframes horse-tail {
+  0%, 24%, 66%, 100% { transform: rotate(0); }
+  34% { transform: rotate(8deg); }
+  43% { transform: rotate(-5deg); }
+  52% { transform: rotate(5deg); }
+  59% { transform: rotate(-2deg); }
+}
+@keyframes horse-paw {
+  0%, 80%, 98%, 100% { transform: rotate(0); }
+  86%, 91% { transform: rotate(-7deg) translateY(-1px); }
+  95% { transform: rotate(1deg); }
+}
+@keyframes horse-sniff {
+  0%, 30%, 80%, 100% { transform: rotate(0); }
+  48%, 66% { transform: rotate(5deg); }
+  55% { transform: rotate(4deg); }
+}
+@keyframes horse-eat-nod {
+  0%, 100% { transform: rotate(0); }
+  50% { transform: rotate(2deg); }
+}
+@keyframes horse-chew {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  50% { transform: translateY(0.7px) scaleY(0.85); }
+}
+@keyframes horse-cheer {
+  0%, 100% { transform: translateY(0); }
+  18% { transform: translateY(1px); }
+  48% { transform: translateY(-9px); }
+  78% { transform: translateY(0); }
+}
+@keyframes horse-wash {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-0.6px); }
+  75% { transform: translateX(0.6px); }
+}
+
+/* Preserve visible sleep marks when the in-app setting stops their keyframes. */
+html.reduce-motion .pet-horse .pet-z { opacity: 1; }

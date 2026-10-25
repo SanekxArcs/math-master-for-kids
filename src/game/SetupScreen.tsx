@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { motion, type MotionStyle } from "motion/react";
+import { motion, type MotionStyle } from "@/lib/motion";
 import { Check, KeyRound, LineChart, Loader2, Lock, Play, RotateCcw } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { parsePairCode } from "@/pair/pairLink";

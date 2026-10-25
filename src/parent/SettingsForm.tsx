@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation } from "convex/react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion } from "@/lib/motion";
 import { Calculator, Check, Gauge, Keyboard, LifeBuoy, Loader2, Trophy, Undo2, Volume2 } from "lucide-react";
 import { api } from "@convex/_generated/api";
 import { Switch } from "@/components/ui/switch";

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AnimatePresence, motion, type MotionStyle } from "motion/react";
+import { AnimatePresence, motion, type MotionStyle } from "@/lib/motion";
 import { Check, Star } from "lucide-react";
 import {
   SLOTS,

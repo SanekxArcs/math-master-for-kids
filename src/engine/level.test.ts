@@ -17,9 +17,13 @@ describe("levels", () => {
     expect(goalForLevel(200, 4)).toBe(680);
   });
 
-  it("stops at the ceiling the dashboard can set", () => {
+  it("keeps targets capped but offers exactly twenty levels", () => {
     expect(goalForLevel(200, 40)).toBe(10000);
-    expect(hasNextLevel({ ...DEFAULT_SETTINGS, goalTarget: 10000 }, 1)).toBe(false);
+    expect(hasNextLevel({ ...DEFAULT_SETTINGS, goalTarget: 10000 }, 1)).toBe(true);
+    expect(hasNextLevel(DEFAULT_SETTINGS, 13)).toBe(true);
+    expect(hasNextLevel(DEFAULT_SETTINGS, 19)).toBe(true);
+    expect(hasNextLevel(DEFAULT_SETTINGS, 20)).toBe(false);
+    expect(hasNextLevel(DEFAULT_SETTINGS, 21)).toBe(false);
     expect(hasNextLevel(DEFAULT_SETTINGS, 1)).toBe(true);
   });
 

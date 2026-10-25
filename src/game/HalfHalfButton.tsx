@@ -27,10 +27,15 @@ export function HalfHalfButton({
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    if (now >= readyAt) return;
-    const id = window.setInterval(() => setNow(Date.now()), 200);
+    const tick = () => {
+      const time = Date.now();
+      setNow(time);
+      if (time >= readyAt) window.clearInterval(id);
+    };
+    const id = window.setInterval(tick, 250);
+    tick();
     return () => window.clearInterval(id);
-  }, [readyAt, now]);
+  }, [readyAt]);
 
   const remainingMs = Math.max(0, readyAt - now);
   const cooling = remainingMs > 0;

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion } from "@/lib/motion";
 import { CameraOff, ScanLine } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TranslationKey } from "@/i18n/translations";

@@ -107,9 +107,11 @@ export function parseStable(raw: string | null): Stable {
       : (pets[0]?.id ?? null);
     return {
       coins: isNum(source.coins) ? Math.max(0, Math.floor(source.coins)) : NEW_STABLE.coins,
+      prestigeLevels: isNum(source.prestigeLevels) ? Math.max(0, Math.floor(source.prestigeLevels)) : 0,
       lastBonusDay: typeof source.lastBonusDay === "string" ? source.lastBonusDay : null,
       pets,
       activeId,
+      favoriteId: isSpecies(source.favoriteId) && pets.some((pet) => pet.id === source.favoriteId) ? source.favoriteId : activeId,
       savedAt: isNum(source.savedAt) ? source.savedAt : 0,
       asleepSince: isNum(source.asleepSince) ? source.asleepSince : null,
       wish: toWish(source.wish, pets),

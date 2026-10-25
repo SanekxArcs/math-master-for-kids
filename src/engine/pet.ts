@@ -234,12 +234,16 @@ export interface Wish {
 
 export interface Stable {
   coins: number;
+  /** Lifetime levels exchanged for prestige. Missing in saves made before prestige. */
+  prestigeLevels?: number;
   /** Local calendar day ("2026-09-25") the daily bonus was last paid. */
   lastBonusDay: string | null;
   /** Empty until the child first visits and names their horse. */
   pets: Pet[];
   /** The pet on screen. Null only while there are no pets. */
   activeId: Species | null;
+  /** Pinned companion in the game, independent of the pet currently being cared for. */
+  favoriteId?: Species | null;
   /**
    * Epoch ms of the last change, 0 for a stable nobody has touched. What
    * detects local changes; server revisions decide backup conflicts.
@@ -255,9 +259,11 @@ export interface Stable {
 
 export const NEW_STABLE: Stable = {
   coins: STARTING_COINS,
+  prestigeLevels: 0,
   lastBonusDay: null,
   pets: [],
   activeId: null,
+  favoriteId: null,
   savedAt: 0,
   asleepSince: null,
   wish: null,
@@ -344,6 +350,21 @@ export function findPet(stable: Stable, id: Species | null): Pet | undefined {
 
 export function activePet(stable: Stable): Pet | undefined {
   return findPet(stable, stable.activeId) ?? stable.pets[0];
+}
+
+export function favoritePet(stable: Stable): Pet | undefined {
+  return findPet(stable, stable.favoriteId ?? null) ?? activePet(stable);
+}
+
+/** A view order only: keep ownership/history intact when the favorite changes. */
+export function orderedPets(stable: Stable): Pet[] {
+  const favorite = favoritePet(stable);
+  return !favorite || stable.pets[0] === favorite ? stable.pets : [favorite, ...stable.pets.filter((pet) => pet.id !== favorite.id)];
+}
+
+export function makeFavorite(stable: Stable, petId: Species): Stable {
+  if (!findPet(stable, petId) || stable.favoriteId === petId) return stable;
+  return { ...stable, favoriteId: petId, activeId: petId };
 }
 
 function withPet(stable: Stable, pet: Pet): Stable {
@@ -587,6 +608,7 @@ export function adopt(stable: Stable, species: Species, name: string, now: numbe
     coins: stable.coins - price,
     pets: [...stable.pets, pet],
     activeId: species,
+    favoriteId: favoritePet(stable)?.id ?? species,
   };
 }
 
@@ -667,8 +689,14 @@ export function coinsForGoal(goal: number): number {
  * every level climbed. The goal already grows with the level, but by itself
  * that only pays for the extra maths; the step is the prize for moving up.
  */
-export function coinsForLevel(goal: number, level: number): number {
-  return coinsForGoal(goal) + LEVEL_COINS * Math.max(0, Math.floor(level) - 1);
+export function coinMultiplier(prestigeLevels = 0): number {
+  const levels = Number.isFinite(prestigeLevels) ? Math.max(0, Math.floor(prestigeLevels)) : 0;
+  return Math.min(Number.MAX_SAFE_INTEGER, 1.05 ** levels);
+}
+
+export function coinsForLevel(goal: number, level: number, prestigeLevels = 0): number {
+  const base = coinsForGoal(goal) + LEVEL_COINS * Math.max(0, Math.floor(level) - 1);
+  return Math.min(Number.MAX_SAFE_INTEGER, Math.round(base * coinMultiplier(prestigeLevels)));
 }
 
 export interface Reward {
@@ -697,10 +725,10 @@ export interface SessionEnd {
  */
 export function sessionReward(stable: Stable, session: SessionEnd, now: number): Reward | null {
   const coins = session.won
-    ? coinsForLevel(session.goal, session.level ?? 1)
+    ? coinsForLevel(session.goal, session.level ?? 1, stable.prestigeLevels)
     : session.goalEnabled
       ? 0
-      : Math.floor(session.points / POINTS_PER_COIN);
+      : Math.min(Number.MAX_SAFE_INTEGER, Math.floor(Math.floor(session.points / POINTS_PER_COIN) * coinMultiplier(stable.prestigeLevels)));
   if (coins <= 0) return null;
   return { coins, bonus: stable.lastBonusDay === dayKey(now) ? 0 : DAILY_BONUS };
 }

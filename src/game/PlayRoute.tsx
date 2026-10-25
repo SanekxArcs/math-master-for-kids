@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { Suspense, lazy, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { convex } from "@/lib/convex";
@@ -7,12 +7,13 @@ import { useI18n } from "@/i18n/useI18n";
 import { useDeviceIdentity, useOutboxSync, useSyncedSettings } from "@/sync/useSync";
 import { useFactStats } from "@/sync/useFactStats";
 import { BackupSync } from "@/sync/BackupSync";
-import { PetsScreen } from "@/pets/PetsScreen";
-import { GameScreen } from "./GameScreen";
 import { RestoreForm } from "./SetupScreen";
 import { parsePairCode } from "@/pair/pairLink";
 import { lockParentAccess } from "@/sync/parentAccess";
 import { useLocalSettings } from "./useLocalSettings";
+
+const PetsScreen = lazy(() => import("@/pets/PetsScreen").then((module) => ({ default: module.PetsScreen })));
+const GameScreen = lazy(() => import("./GameScreen").then((module) => ({ default: module.GameScreen })));
 
 /**
  * Chooses where the game's data comes from.
@@ -30,7 +31,9 @@ export type PlayView = "game" | "pets";
  */
 export function PlayRoute({ view = "game" }: { view?: PlayView }) {
   useEffect(() => { lockParentAccess(); }, []);
-  return convex ? <SyncedGame view={view} /> : <LocalGame view={view} />;
+  return <Suspense fallback={<main className="flex min-h-dvh items-center justify-center"><Loader2 className="size-8 animate-spin text-primary" aria-label="Loading" /></main>}>
+    {convex ? <SyncedGame view={view} /> : <LocalGame view={view} />}
+  </Suspense>;
 }
 
 /** No backend configured — the game still plays, it just records nothing. */

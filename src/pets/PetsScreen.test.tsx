@@ -61,6 +61,24 @@ describe("PetsScreen", () => {
     expect(screen.getByRole("link", { name: "Keep playing" })).toBeInTheDocument();
   });
 
+  it("pins a favorite first and keeps it while caring for another pet and after reload", async () => {
+    const user = userEvent.setup();
+    seed([newPet("horse", "Bella", Date.now()), newPet("cat", "Rudy", Date.now())], 100);
+    const view = renderPets();
+    await user.click(screen.getByRole("button", { name: "Rudy" }));
+    await user.click(screen.getByRole("button", { name: "Make Rudy your favorite" }));
+    expect(saved().favoriteId).toBe("cat");
+    const tabs = screen.getByRole("navigation", { name: "My pets" });
+    expect(within(tabs).getAllByRole("button")[0]).toHaveAccessibleName("Rudy");
+    expect(screen.getByRole("button", { name: "Rudy is your favorite" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(within(tabs).getByRole("button", { name: "Bella" }));
+    expect(saved()).toMatchObject({ activeId: "horse", favoriteId: "cat" });
+    view.unmount();
+    renderPets();
+    expect(within(screen.getByRole("navigation", { name: "My pets" })).getAllByRole("button")[0]).toHaveAccessibleName("Rudy");
+    expect(saved().favoriteId).toBe("cat");
+  });
+
   it("starts with a free horse, named by the child", async () => {
     const user = userEvent.setup();
     renderPets();
@@ -304,5 +322,11 @@ describe("parseStable", () => {
     expect(stable.coins).toBe(7);
     expect(stable.pets).toEqual([]);
     expect(stable.activeId).toBeNull();
+  });
+
+  it("migrates an old active pet to the favorite and ignores an unowned favorite", () => {
+    const old = { ...NEW_STABLE, favoriteId: undefined, activeId: "cat", pets: [newPet("cat", "Rudy", Date.now())] };
+    expect(parseStable(JSON.stringify(old)).favoriteId).toBe("cat");
+    expect(parseStable(JSON.stringify({ ...old, favoriteId: "unicorn" })).favoriteId).toBe("cat");
   });
 });

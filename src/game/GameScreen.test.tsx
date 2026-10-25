@@ -136,7 +136,8 @@ describe("GameScreen", () => {
     expect(shown.some((element) => element.closest("header"))).toBe(true);
     // The meter must warn what the next mistake costs — an invisible escalation
     // just feels like the game turned against them.
-    expect(await screen.findByText("−25 next")).toBeInTheDocument();
+    expect(await screen.findByText("−25")).toBeInTheDocument();
+    expect(screen.getByText("Next mistake")).toBeInTheDocument();
   });
 
   it("50:50 dims half the wrong tiles and never the answer", async () => {
@@ -388,7 +389,7 @@ describe("GameScreen", () => {
     const header = container.querySelector("header");
     expect(within(header!).getByText("Lv 2")).toBeInTheDocument();
     // A new level starts from nothing — the points just banked do not carry.
-    expect(within(header!).getByText("0")).toBeInTheDocument();
+    expect(within(header!).getByRole("progressbar", { name: "" })).toHaveAttribute("aria-valuenow", "0");
   });
 
   it("loses the game, and the level, when the points sink to a quarter of the goal below zero", async () => {
@@ -512,4 +513,49 @@ describe("GameScreen", () => {
     // Found, not got: the points roll up to their new total rather than jump.
     expect(await within(header!).findByText("5")).toBeInTheDocument();
   });
+});
+
+
+it("opens level rewards without losing the current question", async () => {
+  renderGame({ goalTarget: 100 });
+  const question = screen.getByRole("heading", { level: 1 }).textContent;
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Level 1 — view rewards" }));
+  const dialog = screen.getByRole("dialog");
+  expect(within(dialog).getByText("Next: level 2")).toBeInTheDocument();
+  await user.click(within(dialog).getByRole("button", { name: "See all 20 rewards" }));
+  expect(within(dialog).getAllByRole("row")).toHaveLength(21);
+  await user.click(within(dialog).getByRole("button", { name: "Close rewards" }));
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(question ?? "");
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+it("prestiges a won early level through confirmation and starts a clean level one", async () => {
+  localStorage.setItem("math_master_level", "5");
+  localStorage.setItem("math_master_stable", JSON.stringify({ ...NEW_STABLE, coins: 99, savedAt: Date.now() }));
+  localStorage.setItem("math_master_session", JSON.stringify({
+    score: { rawPoints: 510, correct: 10, wrong: 0, goodStreak: 10, badStreak: 0, bestStreak: 10 },
+    won: true, stopped: false, lost: false, savedAt: Date.now(),
+  }));
+  renderGame({ goalTarget: 100 });
+  const user = userEvent.setup();
+  await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Levels and rewards" }));
+  await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Prestige" }));
+  await user.click(screen.getByRole("button", { name: "Confirm prestige" }));
+  expect(localStorage.getItem("math_master_level")).toBe("1");
+  expect(stable()).toMatchObject({ coins: 99, prestigeLevels: 5 });
+  expect(screen.getByRole("button", { name: "Level 1 — view rewards" })).toBeInTheDocument();
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+});
+
+
+it("shows the favorite on the middle pet button even when a different pet was last viewed", () => {
+  localStorage.setItem("math_master_stable", JSON.stringify({ ...NEW_STABLE,
+    pets: [newPet("horse", "Bella", Date.now()), newPet("cat", "Rudy", Date.now())],
+    activeId: "horse", favoriteId: "cat", savedAt: Date.now(),
+  }));
+  renderGame();
+  const button = screen.getByRole("link", { name: "Pause and visit your pets" });
+  expect(button.querySelector("svg.pet-cat")).not.toBeNull();
+  expect(button.querySelector("svg.pet-horse")).toBeNull();
 });
