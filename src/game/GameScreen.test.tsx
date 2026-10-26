@@ -102,8 +102,9 @@ describe("GameScreen", () => {
   });
 
   it("renders a solvable question with the configured number of tiles", () => {
-    renderGame({ difficulty: "hard", timerEnabled: false });
+    const view = renderGame({ difficulty: "hard", timerEnabled: false });
 
+    expect(view.container.querySelector(".welcome-backdrop")).not.toBeNull();
     expect(optionButtons()).toHaveLength(6);
     const answer = solveVisibleQuestion();
     expect(optionButtons().map((b) => Number(b.textContent))).toContain(answer);

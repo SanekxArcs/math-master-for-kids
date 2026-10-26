@@ -1,0 +1,60 @@
+/* Keep care and its reaction together while the child browses the shop. */
+.pet-care-dock {
+  position: sticky;
+  top: 5.25rem;
+  z-index: 20;
+  flex-shrink: 0;
+  scroll-margin-top: 5.25rem;
+}
+.pet-care-scene {
+  height: clamp(180px, 30svh, 260px);
+  justify-content: flex-end;
+  padding: 44px 48px 4px;
+}
+.pet-care-animal {
+  width: clamp(144px, 25svh, 224px);
+  height: clamp(144px, 25svh, 224px);
+}
+.pet-care-choice {
+  display: flex;
+  min-width: 84px;
+  min-height: 82px;
+  flex: 1 0 84px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 14px;
+  padding: 8px 6px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.pet-care-choice:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: -3px;
+}
+.pet-care-choices { overscroll-behavior-x: contain; }
+.pet-speech::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 14px;
+  height: 14px;
+  transform: translateX(-50%) rotate(45deg);
+  border-radius: 0 0 3px 0;
+  background: var(--card);
+}
+@media (max-height: 600px) {
+  .pet-care-scene { height: 160px; padding-top: 36px; }
+  .pet-care-animal { width: 128px; height: 128px; }
+  .pet-care-dock [role="progressbar"] { height: 44px; }
+  .pet-care-options { padding: 6px; }
+  .pet-care-options > div:first-child { margin-bottom: 4px; }
+  .pet-care-options > div:first-child button { width: 24px; height: 24px; }
+  .pet-care-choice { min-height: 74px; padding-block: 6px; }
+}
+@media (max-height: 480px) {
+  .pet-care-dock { position: relative; top: auto; }
+}

@@ -6,13 +6,13 @@ import { Halo, MudSplats, Rumble, Sparkles, Tear, Thermometer, Wear, Zzz, origin
 const INK = "#482D2B";
 const SOCK = "#FFF1D9";
 const MUD = [
-  "M62 116c5-5 13-2 12 4s-9 7-12 3-4-5 0-7z",
-  "M99 130c4-4 12-1 11 4s-7 8-11 4-4-5 0-8z",
-  "M128 111c3-4 9-1 8 3s-5 6-8 3-3-4 0-6z",
-  "M67 151c3-3 8-1 8 3s-6 5-8 2-2-3 0-5z",
+  "M62 112c5-5 13-2 12 4s-9 7-12 3-4-5 0-7z",
+  "M99 126c4-4 12-1 11 4s-7 8-11 4-4-5 0-8z",
+  "M128 107c3-4 9-1 8 3s-5 6-8 3-3-4 0-6z",
+  "M67 155c3-3 8-1 8 3s-6 5-8 2-2-3 0-5z",
 ];
 
-/** A compact standing pony, drawn in one coordinate system with attached joints. */
+/** A standing horse with long lower legs and attached, articulated joints. */
 export function Horse({ mood, mud, worn }: SpeciesArtProps) {
   const uid = `horse-${useId()}`;
   const paint = (name: string) => `url(#${uid}-${name})`;
@@ -37,26 +37,29 @@ export function Horse({ mood, mud, worn }: SpeciesArtProps) {
       <linearGradient id={`${uid}-tail`} x1="48" y1="107" x2="25" y2="155" gradientUnits="userSpaceOnUse">
         <stop stopColor="#674036" /><stop offset="1" stopColor="#412C2A" />
       </linearGradient>
-      <linearGradient id={`${uid}-hoof`} x1="0" y1="169" x2="0" y2="178" gradientUnits="userSpaceOnUse">
+      <linearGradient id={`${uid}-hoof`} x1="0" y1="176" x2="0" y2="185" gradientUnits="userSpaceOnUse">
         <stop stopColor="#66504A" /><stop offset="1" stopColor="#392C2D" />
       </linearGradient>
     </defs>
 
-    <ellipse className="pet-shadow" style={origin(100, 180)} cx="100" cy="180" rx="57" ry="5.5" fill="#483D32" opacity="0.12" />
-    <g className="pet-bob" style={origin(100, 178)}>
+    <ellipse className="pet-shadow" style={origin(100, 187)} cx="100" cy="187" rx="57" ry="5.5" fill="#483D32" opacity="0.12" />
+    <g className="pet-bob" style={origin(100, 185)}>
+      <g transform="translate(0 -4)">
       {back === "wings" && <Wear slot="back" worn={worn} at={{ x: 107, y: 97, scale: 0.95 }} />}
       <g className="pet-tail" style={origin(53, 111)}>
         <path d="M57 106C36 99 24 112 26 131c2 12-4 19-12 24 11 7 23 2 29-6 8-12-1-21 6-30l11-7z" fill={paint("tail")} />
         <path d="M48 112c-13 5-11 16-12 25-1 8-5 13-11 16" fill="none" stroke="#A77955" strokeWidth="2.2" strokeLinecap="round" opacity="0.7" />
         <path d="M43 115c-9 8-3 17-8 28M30 151l5-2" fill="none" stroke="#C18D60" strokeWidth="1.1" strokeLinecap="round" opacity="0.45" />
       </g>
+      </g>
 
       {/* Far legs have their own silhouettes, rather than looking like four equal poles. */}
-      <path d="M62 124c-9 4-11 13-8 23l4 9-4 14c-1 3 1 5 4 5h7l7-24-4-25z" fill="#A56543" />
-      <path d="M53 169h13l1 6c-3 3-12 3-15 1z" fill="#46322D" />
-      <path d="M112 124c-3 11-2 18 2 25l-1 22c0 3 3 4 6 4h6l3-30-1-21z" fill="#A96B46" />
-      <path d="M112 169h14l1 6c-3 3-12 3-16 1z" fill="#46322D" />
+      <path d="M62 120c-9 4-11 16-8 28l4 10-4 19c-1 3 1 5 4 5h7l7-31-4-25z" fill="#A56543" />
+      <path d="M53 176h13l1 6c-3 3-12 3-15 1z" fill="#46322D" />
+      <path d="M112 120c-3 13-2 23 2 31l-1 27c0 3 3 4 6 4h6l3-37-1-21z" fill="#A96B46" />
+      <path d="M112 176h14l1 6c-3 3-12 3-16 1z" fill="#46322D" />
 
+      <g transform="translate(0 -4)">
       <g className="pet-body" style={origin(101, 174)}>
         {/* The neck is behind the barrel; both breathe together to keep the shoulder joined. */}
         <path d="M107 108c13-17 13-36 26-55l24 10c-8 18-14 35-13 61l-23 12z" fill={paint("neck")} />
@@ -108,27 +111,28 @@ export function Horse({ mood, mud, worn }: SpeciesArtProps) {
           {mood === "sad" && <Tear x={153} y={60} />}
         </g>
       </g>
+      </g>
 
       {/* Near legs overlap the barrel, making the hip and shoulder feel attached. */}
-      <g className="horse-hindleg" style={origin(67, 132)}>
-        <path d="M65 124c-10 1-15 11-12 20l12 12-5 14c-1 4 1 5 5 5h7l6-23c1-4-3-8-6-11l5-11z" fill={paint("coat")} />
-        <path d="M64 153l8-1-1 18h-10z" fill={SOCK} />
-        <path d="M61 168c3 1 7 1 11 0l2 7c-4 3-13 4-17 1z" fill={paint("hoof")} />
-        <path d="M62 172l8-.5" stroke="#AC9180" strokeWidth="1.3" strokeLinecap="round" />
-        <path d="M60 133c-3 5-2 9 2 12" fill="none" stroke="#E5AF77" strokeWidth="2.3" strokeLinecap="round" />
+      <g className="horse-hindleg" style={origin(67, 128)}>
+        <path d="M65 120c-10 1-15 14-12 24l12 14-5 19c-1 4 1 5 5 5h7l6-29c1-4-3-9-6-13l5-14z" fill={paint("coat")} />
+        <path d="M64 160l8-1-1 18h-10z" fill={SOCK} />
+        <path d="M61 175c3 1 7 1 11 0l2 7c-4 3-13 4-17 1z" fill={paint("hoof")} />
+        <path d="M62 179l8-.5" stroke="#AC9180" strokeWidth="1.3" strokeLinecap="round" />
+        <path d="M60 129c-3 6-2 11 2 16" fill="none" stroke="#E5AF77" strokeWidth="2.3" strokeLinecap="round" />
       </g>
-      <g className="horse-foreleg" style={origin(131, 128)}>
-        <path d="M126 115c-8 6-7 23 1 35l-1 20c0 4 3 5 6 5h7l1-26c0-16 1-28-7-34z" fill={paint("coat")} />
-        <path d="M127 154c4 2 8 2 12 0v16h-13z" fill={SOCK} />
-        <path d="M126 168c4 2 9 2 13 0l3 7c-4 3-14 4-18 1z" fill={paint("hoof")} />
-        <path d="M128 172l9 .2" stroke="#B69B85" strokeWidth="1.3" strokeLinecap="round" />
-        <path d="M130 130c-2 7-1 12 2 17" fill="none" stroke="#EAB47B" strokeWidth="2.6" strokeLinecap="round" />
+      <g className="horse-foreleg" style={origin(131, 124)}>
+        <path d="M126 111c-8 6-7 29 1 42l-1 24c0 4 3 5 6 5h7l1-29c0-19 1-36-7-42z" fill={paint("coat")} />
+        <path d="M127 161c4 2 8 2 12 0v16h-13z" fill={SOCK} />
+        <path d="M126 175c4 2 9 2 13 0l3 7c-4 3-14 4-18 1z" fill={paint("hoof")} />
+        <path d="M128 179l9 .2" stroke="#B69B85" strokeWidth="1.3" strokeLinecap="round" />
+        <path d="M130 128c-2 9-1 17 2 23" fill="none" stroke="#EAB47B" strokeWidth="2.6" strokeLinecap="round" />
       </g>
       <MudSplats spots={MUD} count={mud} />
-      {mood === "asleep" && <Zzz x={167} y={28} />}
-      {mood === "gone" && <Halo x={151} y={13} />}
-      {mood === "hungry" && <Rumble x={91} y={157} color="#9D684C" />}
-      {mood === "happy" && <Sparkles points={[[32, 67, 0], [184, 32, 1.4]]} color="#F5D78F" />}
+      {mood === "asleep" && <Zzz x={167} y={24} />}
+      {mood === "gone" && <Halo x={151} y={9} />}
+      {mood === "hungry" && <Rumble x={91} y={161} color="#9D684C" />}
+      {mood === "happy" && <Sparkles points={[[32, 63, 0], [184, 28, 1.4]]} color="#F5D78F" />}
     </g>
   </>;
 }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { MotionSetting } from "@/components/MotionSetting";
 import { BackupButton } from "@/sync/BackupButton";
 import { AnimatePresence, motion, useAnimate, useReducedMotion, type MotionStyle } from "@/lib/motion";
-import { Hand, Heart, Moon, PawPrint, Pause, Pencil, Play, Plus, Shirt, ShoppingBasket, Sparkles, Star } from "lucide-react";
+import { Apple, ChevronDown, Droplets, Hand, Heart, Moon, PawPrint, Pause, Play, Plus, Shirt, Sparkles, Star, Stethoscope, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   NAME_MAX,
@@ -54,7 +54,6 @@ import {
   SessionStats,
   ghostActionClass,
   primaryActionClass,
-  secondaryActionClass,
 } from "@/game/GameDialog";
 import { Backdrop as WelcomeBackdrop, fieldClass, labelClass } from "@/game/WelcomeShell";
 import { readSession } from "@/game/useLocalSession";
@@ -67,6 +66,7 @@ import { Scene } from "./Scene";
 import { TryOnDialog, Wardrobe, WishBanner } from "./Wardrobe";
 import { CatchGame, type GamePhase } from "./CatchGame";
 import { DEFAULT_NAME, ITEM_NAME, SPECIES_NAME, SPECIES_SAYS } from "./names";
+import "./pet-care.css";
 
 export { SPECIES_NAME } from "./names";
 
@@ -161,20 +161,21 @@ export function PetsScreen() {
 
       {/* The twin of the game's HUD: the same frosted panel along the top. */}
       <header className="sticky top-3 z-30 flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-card/85 py-2 pl-2 pr-3 shadow-[0_12px_32px_-14px_oklch(0.4_0.16_295/0.45)] backdrop-blur-md">
-        <div className="flex items-center gap-2.5">
-          <span className="flex size-10 items-center justify-center rounded-full bg-linear-to-b from-(--option-3) to-[oklch(0.62_0.18_350)] text-white shadow-[0_4px_12px_-4px_var(--option-3)]">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="hidden size-10 shrink-0 items-center justify-center rounded-full bg-linear-to-b from-(--option-3) to-[oklch(0.62_0.18_350)] text-white shadow-[0_4px_12px_-4px_var(--option-3)] min-[360px]:flex">
             <PawPrint className="size-5" aria-hidden />
           </span>
-          <h1 className="font-display text-2xl font-black">{t("myPets")}</h1>
+          <h1 className="truncate font-display text-xl font-black sm:text-2xl">{t("myPets")}</h1>
         </div>
         <CoinCount coins={stable.coins} className="text-lg" />
       </header>
 
-      {session && <PausedGame score={session.score} />}
-
       {pet ? (
         <>
           <PetTabs stable={stable} active={pet} onAdd={() => setShopOpen(true)} />
+          {/* Keyed per pet: switching must not carry a floating reaction or a
+              half-pressed grown-up switch over to the next one. */}
+          <Stall key={pet.id} stable={stable} pet={pet} sound={settings.soundEnabled} bought={bought} onTry={setTrying} />
           <WishBanner
             stable={stable}
             onOpen={(owner, item) => {
@@ -182,13 +183,12 @@ export function PetsScreen() {
               setTrying(item);
             }}
           />
-          {/* Keyed per pet: switching must not carry a floating reaction or a
-              half-pressed grown-up switch over to the next one. */}
-          <Stall key={pet.id} stable={stable} pet={pet} sound={settings.soundEnabled} bought={bought} onTry={setTrying} />
         </>
       ) : (
         <Adoption />
       )}
+
+      {session && <PausedGame score={session.score} />}
 
       <AnimatePresence>
         {shopOpen && <AdoptDialog stable={stable} onClose={() => setShopOpen(false)} />}
@@ -480,8 +480,6 @@ interface Floater {
   speech?: boolean;
 }
 
-type Tab = "shop" | "wardrobe";
-
 /** What a tapped pet does, in turn: a hop, a wiggle, a spin. */
 const TRICKS = [
   { y: [0, -30, 0], scaleY: [1, 1.06, 1] },
@@ -508,7 +506,8 @@ function Stall({
   const asleep = isAsleep(stable) && pet.alive;
   const [floaters, setFloaters] = useState<Floater[]>([]);
   const [action, setAction] = useState<{ id: number; kind: PetAction } | null>(null);
-  const [tab, setTab] = useState<Tab>("shop");
+  const [care, setCare] = useState<ItemKind | null>(null);
+  const [wardrobeOpen, setWardrobeOpen] = useState(false);
   const [game, setGame] = useState<GamePhase | null>(null);
   const [caught, setCaught] = useState(0);
   // The round's end is called from inside the game's own timer, so it reads
@@ -518,6 +517,8 @@ function Stall({
   const [grownUpOpen, setGrownUpOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const pressTimer = useRef<number | null>(null);
+  const heldName = useRef(false);
+  const dockRef = useRef<HTMLElement>(null);
   const sceneRef = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion();
   const [figure, animateFigure] = useAnimate<HTMLButtonElement>();
@@ -526,6 +527,10 @@ function Stall({
   const float = (floater: Omit<Floater, "id">) => {
     const id = ++nextId.current;
     setFloaters((current) => [...current.slice(-5), { ...floater, id }]);
+    window.setTimeout(
+      () => setFloaters((current) => current.filter((each) => each.id !== id)),
+      floater.speech ? 3000 : 1200,
+    );
   };
 
   const act = (kind: PetAction) => {
@@ -546,10 +551,17 @@ function Stall({
   }, [bought]);
 
   const use = (item: ShopItem) => {
+    if (whyNot(readStable(), pet.id, item) !== null) return;
     updateStable((current) => buy(current, pet.id, item.id, Date.now()));
+    // A purchase from the lower shop returns to the animal before its reaction.
+    const box = sceneRef.current?.getBoundingClientRect();
+    if (box && (box.top < 0 || box.bottom > window.innerHeight - 90)) {
+      dockRef.current?.scrollIntoView({ behavior: "instant", block: "start" });
+    }
     act(KIND_ACTION[item.kind]);
     playSound(KIND_SOUND[item.kind], sound);
     float({ text: item.emoji });
+    float({ text: t("newThingJoy", { name: pet.name }), speech: true });
   };
 
   const pat = () => {
@@ -570,10 +582,14 @@ function Stall({
     const x = box ? ((event.clientX - box.left) / box.width) * 100 : undefined;
     const y = box ? ((event.clientY - box.top) / box.height) * 100 : undefined;
     float({ text: n % 5 === 4 ? "🌟" : "💖", x, y });
-    if (n % 3 === 0) {
-      const says: TranslationKey = n % 9 === 0 ? SPECIES_SAYS[pet.species] : n % 9 === 3 ? "saysGiggle" : "saysLove";
-      float({ text: t(says), speech: true });
-    }
+    const says: TranslationKey = n % 4 === 0
+      ? MOOD_TEXT[mood]
+      : n % 4 === 1
+        ? SPECIES_SAYS[pet.species]
+        : n % 4 === 2
+          ? "saysGiggle"
+          : "saysLove";
+    float({ text: t(says, { name: pet.name }), speech: true });
     playSound("pat", sound);
     if (canPet(pet, Date.now())) pat();
   };
@@ -606,7 +622,11 @@ function Stall({
   };
 
   const startPress = () => {
-    pressTimer.current = window.setTimeout(() => setGrownUpOpen(true), GROWN_UP_PRESS_MS);
+    heldName.current = false;
+    pressTimer.current = window.setTimeout(() => {
+      heldName.current = true;
+      setGrownUpOpen(true);
+    }, GROWN_UP_PRESS_MS);
   };
   const endPress = () => {
     if (pressTimer.current !== null) window.clearTimeout(pressTimer.current);
@@ -620,20 +640,43 @@ function Stall({
   const playMinutes = Math.ceil((pet.lastPlayedAt + PLAY_COOLDOWN_MS - now) / 60_000);
   const items = itemsFor(pet.species);
   const vacation = onVacation(stable);
-  const worried = mood === "sick" || mood === "gone" || mood === "hungry" || mood === "dirty" || mood === "sad";
   const mud = pet.alive ? Math.floor((100 - pet.clean) / 25) : 0;
   const tappable = pet.alive && !asleep && game === null;
 
   return (
     <>
       <motion.section
+        ref={dockRef}
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="overflow-hidden rounded-xl border border-border/70 bg-card/90 shadow-[0_18px_50px_-20px_oklch(0.4_0.16_295/0.5)] backdrop-blur-md"
+        className="pet-care-dock overflow-hidden rounded-xl border border-border/70 bg-card shadow-[0_18px_50px_-20px_oklch(0.4_0.16_295/0.5)]"
       >
         <div ref={sceneRef} className="relative">
-          <Scene home={pet.worn.home} night={asleep} gone={!pet.alive}>
+          <Scene home={pet.worn.home} night={asleep} gone={!pet.alive} className="pet-care-scene">
             {asleep && <NightSky />}
+            <div className="absolute inset-x-3 top-3 z-20 flex items-start justify-between gap-3">
+              <h2 className="min-w-0 max-w-[calc(100%-3.5rem)]">
+                <button type="button" aria-label={t("renamePet", { name: pet.name })}
+                  onClick={() => { if (!heldName.current) setRenaming(true); heldName.current = false; }}
+                  onPointerDown={startPress} onPointerUp={endPress} onPointerLeave={endPress} onPointerCancel={endPress}
+                  onContextMenu={(event) => event.preventDefault()}
+                  className="block max-w-full truncate rounded-full border border-white/20 bg-card/90 px-3.5 py-2 font-display text-lg font-black leading-tight text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring">
+                  {pet.name}
+                </button>
+              </h2>
+              <button type="button" aria-pressed={favoritePet(stable)?.id === pet.id}
+                aria-label={t(favoritePet(stable)?.id === pet.id ? "favoritePetSelected" : "makeFavoritePet", { name: pet.name })}
+                title={t("favoritePetHint")}
+                onClick={() => updateStable((current) => makeFavorite(current, pet.id))}
+                className={cn("flex size-11 shrink-0 items-center justify-center rounded-full border border-white/20 bg-card/90 shadow-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring", favoritePet(stable)?.id === pet.id ? "text-primary" : "text-muted-foreground")}>
+                <Star className="size-5" fill={favoritePet(stable)?.id === pet.id ? "currentColor" : "none"} aria-hidden />
+              </button>
+            </div>
+            {pet.alive && <div className="pointer-events-none absolute inset-x-2.5 bottom-3 z-20 flex justify-between">
+              {[STATS.slice(0, 2), STATS.slice(2)].map((side, i) => <div key={i} className="pet-stat-side flex gap-1.5">
+                {side.map(({ stat, emoji, label }) => <StatBar key={stat} emoji={emoji} label={t(label)} value={pet[stat]} />)}
+              </div>)}
+            </div>}
             <div className="relative z-10">
               {/* The pet itself. Every state it can be in shows on the figure,
                   not only in the bars: a child who cannot read "Clean 20%" yet
@@ -656,7 +699,7 @@ function Stall({
                   worn={pet.worn}
                   action={action?.kind ?? null}
                   animated
-                  className="size-56"
+                  className="pet-care-animal"
                 />
               </motion.button>
             </div>
@@ -665,19 +708,20 @@ function Stall({
               {floaters.map((floater) => (
                 <motion.span
                   key={floater.id}
-                  initial={{ opacity: 1, y: 0, scale: 0.7 }}
-                  animate={{ opacity: 0, y: floater.speech ? -50 : -90, scale: floater.speech ? 1 : 1.6 }}
-                  transition={{ duration: floater.speech ? 1.8 : 1.1, ease: "easeOut" }}
-                  onAnimationComplete={() => setFloaters((current) => current.filter((each) => each.id !== floater.id))}
+                  initial={floater.speech ? { opacity: 0, y: 8, scale: 0.86 } : { opacity: 1, y: 0, scale: 0.7 }}
+                  animate={floater.speech ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: -90, scale: 1.6 }}
+                  exit={floater.speech ? { opacity: 0, y: -10, scale: 0.96 } : { opacity: 0 }}
+                  transition={{ duration: floater.speech ? 0.2 : 1.1, ease: "easeOut" }}
                   className={cn(
                     "pointer-events-none absolute z-20 -translate-x-1/2",
                     floater.speech
-                      ? "top-6 left-1/2 whitespace-nowrap rounded-2xl bg-card px-3 py-1.5 font-display text-base font-black text-foreground shadow-lg"
+                      ? "pet-speech top-14 left-1/2 max-w-[76%] rounded-2xl bg-card px-3 py-1.5 text-center font-display text-sm font-black leading-tight text-foreground shadow-lg"
                       : "text-5xl",
                     !floater.speech && floater.x === undefined && "left-1/2 top-1/3",
                   )}
                   style={floater.x !== undefined ? { left: `${floater.x}%`, top: `${(floater.y ?? 40) - 8}%` } : {}}
-                  aria-hidden
+                  role={floater.speech ? "status" : undefined}
+                  aria-hidden={floater.speech ? undefined : true}
                 >
                   {floater.text}
                 </motion.span>
@@ -700,145 +744,55 @@ function Stall({
           )}
         </div>
 
-        <div className="px-5 pb-5 pt-3 text-center">
-          {/* The grown-up switch hides behind a long press on the name: findable
-              by someone who was told where it is, not by a child tapping around. */}
-          <div className="flex items-center justify-center gap-2">
-            <h2
-              className="min-w-0 select-none wrap-break-word font-display text-3xl font-black text-foreground"
-              onPointerDown={startPress}
-              onPointerUp={endPress}
-              onPointerLeave={endPress}
-              onPointerCancel={endPress}
-              onContextMenu={(event) => event.preventDefault()}
-            >
-              {pet.name}
-            </h2>
-            {/* Beside the name rather than on it, so the long press stays the grown-ups'. */}
-            <button
-              type="button"
-              onClick={() => setRenaming(true)}
-              aria-label={t("renamePet", { name: pet.name })}
-              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted/70 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-4 focus-visible:ring-ring focus-visible:outline-none"
-            >
-              <Pencil className="size-4" aria-hidden />
-            </button>
+        {pet.alive && <fieldset disabled={asleep} className="pet-care-controls min-w-0 border-t border-border/60 p-2 disabled:opacity-50">
+          <div className="grid grid-cols-4 gap-1.5">
+            {([
+              ["play", Play, "carePlay"], ["food", Apple, "careFeed"],
+              ["care", Droplets, "careWash"], ["vet", Stethoscope, "careHeal"],
+            ] as const).map(([kind, Icon, label]) => <button key={kind} type="button"
+              aria-expanded={care === kind} aria-controls={care === kind ? `pet-care-${pet.id}` : undefined}
+              onClick={() => setCare((current) => current === kind ? null : kind)}
+              className={cn("flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border-b-2 border-black/15 px-1 py-2 font-display text-xs font-black transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring",
+                care === kind ? "bg-primary text-primary-foreground shadow-sm" : "bg-secondary text-secondary-foreground hover:bg-primary/15")}>
+              <Icon className="size-5" aria-hidden />{t(label)}
+            </button>)}
           </div>
-          <button type="button" aria-pressed={favoritePet(stable)?.id === pet.id}
-            aria-label={t(favoritePet(stable)?.id === pet.id ? "favoritePetSelected" : "makeFavoritePet", { name: pet.name })}
-            title={t("favoritePetHint")}
-            onClick={() => updateStable((current) => makeFavorite(current, pet.id))}
-            className={cn("mx-auto mt-2 flex min-h-10 items-center justify-center gap-1.5 rounded-full border-b-2 border-black/10 px-3 py-1.5 font-display text-xs font-bold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring",
-              favoritePet(stable)?.id === pet.id ? "bg-primary/15 text-primary" : "bg-secondary text-secondary-foreground")}>
-            <Star className="size-4" fill={favoritePet(stable)?.id === pet.id ? "currentColor" : "none"} aria-hidden="true" />
-            {t(favoritePet(stable)?.id === pet.id ? "favoritePetBadge" : "makeFavoritePetShort")}
-          </button>
-          {/* What the pet would say, in a speech bubble — urgent ones in red. */}
-          <motion.p
-            key={mood}
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className={cn(
-              "relative mx-auto mt-2 inline-block rounded-2xl px-4 py-2 text-sm font-bold",
-              worried ? "bg-wrong/10 text-wrong" : "bg-secondary text-secondary-foreground",
-            )}
-            role="status"
-          >
-            {t(MOOD_TEXT[mood], { name: pet.name })}
-          </motion.p>
-        </div>
+          {care && <section id={`pet-care-${pet.id}`} aria-label={t("careOptions")} className="pet-care-options mt-2 rounded-2xl bg-muted/45 p-2">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-xs font-black text-muted-foreground">{t(KINDS.find((entry) => entry.kind === care)!.label)}</h3>
+              <button type="button" aria-label={t("careClose")} onClick={() => setCare(null)} className="-my-1 flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="size-4" aria-hidden /></button>
+            </div>
+            <div className="pet-care-choices flex gap-2 overflow-x-auto pb-1">
+              {care === "play" && <>
+                <button type="button" onClick={pat} disabled={!petReady} className="pet-care-choice bg-secondary text-secondary-foreground disabled:opacity-50">
+                  <Hand className="size-6" aria-hidden /><span>{t("petHorse")}</span>
+                  <span className="text-[10px] text-muted-foreground">{petReady ? t("careFree") : t("petAgainIn", { minutes: petMinutes })}</span>
+                </button>
+                <button type="button" onClick={() => { setCare(null); setGame("ready"); }} disabled={!playReady || game !== null} className="pet-care-choice bg-secondary text-secondary-foreground disabled:opacity-50">
+                  <span className="text-2xl leading-none" aria-hidden>🎾</span><span>{t("playCatch")}</span>
+                  <span className="text-[10px] text-muted-foreground">{playReady ? t("careFree") : t("petAgainIn", { minutes: playMinutes })}</span>
+                </button>
+              </>}
+              {items.filter((item) => item.kind === care).map((item) => <ItemButton key={item.id} item={item} compact hue={KIND_HUE[care]}
+                refusal={whyNot(stable, pet.id, item)} coins={stable.coins} onUse={() => use(item)} />)}
+            </div>
+          </section>}
+        </fieldset>}
       </motion.section>
 
       {pet.alive ? (
-        // `disabled` on a fieldset reaches every button inside: all the care
-        // waits until a solved sum wakes the pet.
         <fieldset disabled={asleep} className={cn("contents", asleep && "[&_button]:opacity-50")}>
-          <section className="rounded-xl border border-border/70 bg-card/90 p-4 shadow-[0_12px_32px_-18px_oklch(0.4_0.16_295/0.45)] backdrop-blur-md">
-            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-              {STATS.map(({ stat, emoji, label }) => (
-                <StatBar key={stat} emoji={emoji} label={t(label)} value={pet[stat]} />
-              ))}
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                onClick={pat}
-                disabled={!petReady}
-                className={cn(secondaryActionClass, "flex-col gap-0 py-2 text-base disabled:opacity-60")}
-              >
-                <span className="flex items-center gap-1.5">
-                  <Hand className="size-5" aria-hidden />
-                  {t("petHorse")}
-                </span>
-                {!petReady && (
-                  <span className="text-xs font-bold text-muted-foreground">{t("petAgainIn", { minutes: petMinutes })}</span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setGame("ready")}
-                disabled={!playReady || game !== null}
-                className={cn(secondaryActionClass, "flex-col gap-0 py-2 text-base disabled:opacity-60")}
-              >
-                <span className="flex items-center gap-1.5">
-                  <span aria-hidden>🎾</span>
-                  {t("playCatch")}
-                </span>
-                {!playReady && (
-                  <span className="text-xs font-bold text-muted-foreground">{t("petAgainIn", { minutes: playMinutes })}</span>
-                )}
-              </button>
-            </div>
-          </section>
-
-          <section className="space-y-4 rounded-xl border border-border/70 bg-card/90 p-4 shadow-[0_12px_32px_-18px_oklch(0.4_0.16_295/0.45)] backdrop-blur-md">
-            <div className="grid grid-cols-2 gap-1 rounded-xl bg-muted/70 p-1" role="tablist">
-              {(
-                [
-                  ["shop", ShoppingBasket, "tabShop"],
-                  ["wardrobe", Shirt, "tabWardrobe"],
-                ] as const
-              ).map(([id, Icon, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === id}
-                  onClick={() => setTab(id)}
-                  className={cn(
-                    "flex items-center justify-center gap-2 rounded-lg py-2 font-display font-black transition-colors focus-visible:ring-4 focus-visible:ring-ring focus-visible:outline-none",
-                    tab === id ? "bg-card text-foreground shadow" : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  <Icon className="size-4" aria-hidden />
-                  {t(label)}
-                </button>
-              ))}
-            </div>
-
-            {tab === "shop" ? (
-              KINDS.map(({ kind, label }) => (
-                <div key={kind}>
-                  <h4 className="mb-2 text-xs font-black uppercase tracking-widest text-muted-foreground">{t(label)}</h4>
-                  <div className="grid grid-cols-3 gap-x-2.5 gap-y-3.5 sm:grid-cols-4">
-                    {items
-                      .filter((item) => item.kind === kind)
-                      .map((item) => (
-                        <ItemButton
-                          key={item.id}
-                          item={item}
-                          hue={KIND_HUE[kind]}
-                          refusal={whyNot(stable, pet.id, item)}
-                          coins={stable.coins}
-                          onUse={() => use(item)}
-                        />
-                      ))}
-                  </div>
-                </div>
-              ))
-            ) : (
+          <section className="rounded-xl border border-border/70 bg-card/90 p-2 shadow-[0_12px_32px_-18px_oklch(0.4_0.16_295/0.45)] backdrop-blur-md">
+            <button type="button" aria-expanded={wardrobeOpen} aria-controls={`wardrobe-${pet.id}`}
+              onClick={() => setWardrobeOpen((open) => !open)}
+              className="flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring">
+              <span className="flex size-9 items-center justify-center rounded-full bg-primary/15 text-primary"><Shirt className="size-4" aria-hidden /></span>
+              <span className="flex-1 font-display text-lg font-black">{t("tabWardrobe")}</span>
+              <ChevronDown className={cn("size-5 text-muted-foreground transition-transform duration-200", wardrobeOpen && "rotate-180")} aria-hidden />
+            </button>
+            {wardrobeOpen && <div id={`wardrobe-${pet.id}`} className="space-y-4 px-2 pb-2 pt-3">
               <Wardrobe stable={stable} pet={pet} onTry={onTry} onToggle={wearToggle} />
-            )}
+            </div>}
           </section>
         </fieldset>
       ) : (
@@ -911,12 +865,14 @@ function ItemButton({
   refusal,
   coins,
   onUse,
+  compact = false,
 }: {
   item: ShopItem;
   hue: string;
   refusal: ReturnType<typeof whyNot>;
   coins: number;
   onUse: () => void;
+  compact?: boolean;
 }) {
   const { t } = useI18n();
   const name = t(ITEM_NAME[item.id] ?? "itemHay");
@@ -928,10 +884,10 @@ function ItemButton({
       aria-label={t("buyItem", { item: name, price: item.price })}
       data-state={refusal !== null ? "dim" : undefined}
       whileTap={refusal === null ? { scale: 0.92, rotate: -3 } : {}}
-      className="answer-tile flex flex-col items-center gap-1 px-1.5 pb-2 pt-2.5 disabled:cursor-default"
+      className={cn("answer-tile flex flex-col items-center gap-1 px-1.5 pb-2 pt-2.5 disabled:cursor-default", compact && "pet-care-choice")}
       style={{ "--tile": hue } as MotionStyle}
     >
-      <span className="relative text-4xl leading-none drop-shadow-sm" aria-hidden>
+      <span className={cn("relative leading-none", compact ? "text-2xl" : "text-4xl drop-shadow-sm")} aria-hidden>
         {item.emoji}
       </span>
       <span className="relative text-xs font-bold leading-tight text-foreground">{name}</span>
@@ -983,30 +939,13 @@ function StatBar({ emoji, label, value }: { emoji: string; label: string; value:
   const shown = Math.round(value);
   const tone = value < 25 ? "bg-wrong" : value < 50 ? "bg-combo" : "bg-correct";
   return (
-    <div>
-      <div className="mb-1 flex items-center justify-between gap-2 text-sm font-bold">
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden>{emoji}</span> {label}
-        </span>
-        <span className={cn("tabular-nums", value < 25 ? "text-wrong" : "text-muted-foreground")}>{shown}%</span>
+    <div className="pet-stat flex w-8 flex-col items-center gap-1 rounded-full border border-white/35 bg-card/75 px-1 py-1.5 shadow-[0_3px_12px_oklch(0_0_0/0.15)] backdrop-blur-sm" title={`${label}: ${shown}%`}>
+      <span className="flex size-5 items-center justify-center rounded-full bg-white/65 text-sm leading-none shadow-sm dark:bg-white/15" aria-hidden>{emoji}</span>
+      <div className="relative h-12 w-1.5 overflow-hidden rounded-full bg-black/15 shadow-inner"
+        role="progressbar" aria-label={label} aria-valuenow={shown} aria-valuemin={0} aria-valuemax={100} aria-orientation="vertical">
+        <div className={cn("absolute inset-x-0 bottom-0 rounded-full transition-[height,background-color] duration-300", tone)} style={{ height: `${Math.max(4, Math.min(100, value))}%` }} />
       </div>
-      <div
-        className="relative h-3.5 w-full overflow-hidden rounded-full bg-muted shadow-[inset_0_1px_3px_oklch(0_0_0/0.14)]"
-        role="progressbar"
-        aria-label={label}
-        aria-valuenow={shown}
-        aria-valuemin={0}
-        aria-valuemax={100}
-      >
-        <motion.div
-          className={cn("relative h-full overflow-hidden rounded-full transition-colors duration-500", tone, value < 25 && "animate-pulse")}
-          initial={false}
-          animate={{ width: `${value}%` }}
-          transition={{ type: "spring", stiffness: 160, damping: 24 }}
-        >
-          <span className="absolute inset-x-1.5 top-0.5 h-1 rounded-full bg-white/40" aria-hidden />
-        </motion.div>
-      </div>
+      <span className={cn("text-[8px] font-black leading-none tabular-nums", value < 25 ? "text-wrong" : "text-foreground/75")} aria-hidden>{shown}</span>
     </div>
   );
 }

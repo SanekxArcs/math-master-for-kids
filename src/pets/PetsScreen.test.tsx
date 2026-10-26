@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { NEW_STABLE, REVIVE_PRICE, SPECIES, newPet, type Pet, type Stable } from "@/engine";
@@ -41,8 +41,20 @@ describe("PetsScreen", () => {
     localStorage.setItem(KEY, JSON.stringify(stable));
     renderPets();
 
-    expect(screen.getByRole("status")).toHaveTextContent("Sparky is fast asleep");
-    expect(screen.getByRole("button", { name: "Hay, 2 coins" })).toBeDisabled();
+    expect(document.querySelector(".pet-care-animal")).toHaveClass("mood-asleep");
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.getByRole("button", { name: "Feed" })).toBeDisabled();
+  });
+
+  it("shows the pet message as a temporary bubble only after the animal is tapped", () => {
+    seed([newPet("horse", "Bella", Date.now())], 10);
+    const view = renderPets();
+    expect(screen.queryByRole("status")).toBeNull();
+    const animal = view.container.querySelector(".pet-care-animal")?.closest("button");
+    expect(animal).not.toBeNull();
+    fireEvent.pointerDown(animal!, { clientX: 190, clientY: 180 });
+    expect(screen.getByRole("status")).toHaveTextContent("Bella is very happy!");
+    expect(screen.getByRole("status")).toHaveClass("pet-speech");
   });
 
   it("holds the paused game, with the way to finish for today", () => {
@@ -113,20 +125,43 @@ describe("PetsScreen", () => {
     seed([{ ...newPet("horse", "Bella", Date.now()), food: 30 }], 10);
     renderPets();
 
-    await user.click(screen.getByRole("button", { name: "Hay, 2 coins" }));
+    await user.click(screen.getByRole("button", { name: "Feed" }));
+    await user.click(within(screen.getByRole("region", { name: "Care options" })).getByRole("button", { name: "Hay, 2 coins" }));
 
     await waitFor(() => expect(saved().coins).toBe(8));
     expect(screen.getByRole("progressbar", { name: "Food" })).toHaveAttribute("aria-valuenow", "55");
   });
 
-  it("does not sell what the pet does not need or the child cannot afford", () => {
+  it("offers care beside the animal, switches options, and keeps its reaction visible", async () => {
+    const user = userEvent.setup();
+    seed([{ ...newPet("horse", "Bella", Date.now()), food: 30, clean: 30 }], 30);
+    const view = renderPets();
+    await user.click(screen.getByRole("button", { name: "Feed" }));
+    const options = screen.getByRole("region", { name: "Care options" });
+    await user.click(within(options).getByRole("button", { name: "Hay, 2 coins" }));
+    expect(saved().coins).toBe(28);
+    expect(view.container.querySelector(".pet-care-dock .pet-horse")).toHaveClass("act-eat");
+    expect(screen.getByRole("progressbar", { name: "Food" })).toHaveAttribute("aria-orientation", "vertical");
+    expect(screen.getByRole("button", { name: "Feed" })).toHaveAttribute("aria-expanded", "true");
+    await user.click(screen.getByRole("button", { name: "Wash" }));
+    expect(within(options).queryByRole("button", { name: /Hay/ })).toBeNull();
+    await user.click(within(options).getByRole("button", { name: /Sponge/ }));
+    expect(view.container.querySelector(".pet-care-dock .pet-horse")).toHaveClass("act-wash");
+    await user.click(screen.getByRole("button", { name: "Close options" }));
+    expect(screen.queryByRole("region", { name: "Care options" })).toBeNull();
+  });
+
+  it("does not sell what the pet does not need or the child cannot afford", async () => {
+    const user = userEvent.setup();
     seed([newPet("horse", "Bella", Date.now())], 3);
     renderPets();
 
-    const medicine = screen.getByRole("button", { name: /Medicine/ });
+    await user.click(screen.getByRole("button", { name: "Heal" }));
+    const medicine = within(screen.getByRole("region", { name: "Care options" })).getByRole("button", { name: /Medicine/ });
     expect(medicine).toBeDisabled();
     expect(within(medicine).getByText("Full")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Shower/ })).toHaveTextContent("2 more");
+    await user.click(screen.getByRole("button", { name: "Wash" }));
+    expect(within(screen.getByRole("region", { name: "Care options" })).getByRole("button", { name: /Shower/ })).toHaveTextContent("2 more");
   });
 
   it("adopts an orange cat for coins, with its own menu, and switches back", async () => {
@@ -146,12 +181,14 @@ describe("PetsScreen", () => {
     expect(await screen.findByRole("heading", { name: "Rudy" })).toBeInTheDocument();
     expect(saved().coins).toBe(5);
     expect(saved().pets.map((pet) => pet.species)).toEqual(["horse", "cat"]);
-    expect(screen.getByRole("button", { name: /Fish/ })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Feed" }));
+    expect(within(screen.getByRole("region", { name: "Care options" })).getByRole("button", { name: /Fish/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Hay/ })).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Bella" }));
     expect(await screen.findByRole("heading", { name: "Bella" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Hay/ })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Feed" }));
+    expect(within(screen.getByRole("region", { name: "Care options" })).getByRole("button", { name: /Hay/ })).toBeInTheDocument();
   });
 
   it("dresses the pet up: try it on, buy it, and it is on", async () => {
@@ -159,7 +196,11 @@ describe("PetsScreen", () => {
     seed([newPet("horse", "Bella", Date.now())], 450);
     renderPets();
 
-    await user.click(screen.getByRole("tab", { name: /Dress up/ }));
+    const wardrobe = screen.getByRole("button", { name: "Dress up" });
+    expect(wardrobe).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("tab", { name: /Hats/ })).toBeNull();
+    await user.click(wardrobe);
+    expect(wardrobe).toHaveAttribute("aria-expanded", "true");
     await user.click(screen.getByRole("tab", { name: /Hats/ }));
     await user.click(screen.getByRole("button", { name: "Golden crown, 400 coins" }));
     const dialog = screen.getByRole("dialog");
@@ -182,7 +223,7 @@ describe("PetsScreen", () => {
     seed([newPet("dog", "Buddy", Date.now())], 500);
     renderPets();
 
-    await user.click(screen.getByRole("tab", { name: /Dress up/ }));
+    await user.click(screen.getByRole("button", { name: "Dress up" }));
     expect(screen.getByRole("tab", { name: /K-pop/ })).toHaveAttribute("aria-selected", "true");
     for (const name of ["Idol headset", "Gat hat", "Magpie friend", "Golden necklace", "Star shades", "Hunter's sword", "Concert stage"]) {
       expect(screen.getByRole("button", { name: new RegExp(name) })).toBeInTheDocument();
@@ -199,7 +240,7 @@ describe("PetsScreen", () => {
     seed([newPet("horse", "Bella", Date.now())], 120);
     renderPets();
 
-    await user.click(screen.getByRole("tab", { name: /Dress up/ }));
+    await user.click(screen.getByRole("button", { name: "Dress up" }));
     await user.click(screen.getByRole("tab", { name: /Hats/ }));
     await user.click(screen.getByRole("button", { name: "Golden crown, 400 coins" }));
     const dialog = screen.getByRole("dialog");
@@ -220,6 +261,7 @@ describe("PetsScreen", () => {
       seed([{ ...newPet("horse", "Bella", Date.now()), happy: 20 }], 10);
       renderPets();
 
+      await user.click(screen.getByRole("button", { name: "Play" }));
       await user.click(screen.getByRole("button", { name: /Play catch/ }));
       await user.click(screen.getByRole("button", { name: "Go!" }));
       await vi.advanceTimersByTimeAsync(700);
@@ -233,6 +275,7 @@ describe("PetsScreen", () => {
       expect(saved().pets[0]!.lastPlayedAt).toBeGreaterThan(0);
 
       await user.click(screen.getByRole("button", { name: "Done" }));
+      await user.click(screen.getByRole("button", { name: "Play" }));
       expect(screen.getByRole("button", { name: /Play catch/ })).toBeDisabled();
     } finally {
       vi.useRealTimers();
@@ -251,7 +294,8 @@ describe("PetsScreen", () => {
 
     expect(await screen.findByRole("heading", { name: "Derpy" })).toBeInTheDocument();
     expect(saved().coins).toBe(0);
-    expect(screen.getByRole("button", { name: /Ramyeon/ })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Feed" }));
+    expect(within(screen.getByRole("region", { name: "Care options" })).getByRole("button", { name: /Ramyeon/ })).toBeInTheDocument();
   });
 
   it("offers a way back once a pet is gone, for enough coins", async () => {
@@ -260,7 +304,7 @@ describe("PetsScreen", () => {
     seed([gone], REVIVE_PRICE);
     renderPets();
 
-    expect(screen.getByText("Bella is now in pet heaven.")).toBeInTheDocument();
+    expect(document.querySelector(".pet-care-animal")).toHaveClass("mood-gone");
     expect(screen.queryByRole("button", { name: /Hay/ })).toBeNull();
 
     await user.click(screen.getByRole("button", { name: /Bring Bella back/ }));

@@ -89,9 +89,9 @@ function BackupForProfile({ identity, children }: { identity: DeviceIdentity; ch
       <Sync identity={identity} onChange={onChange} />
     </QuietBoundary>
     {ready && !state.blocked ? <>
-    <span role="status" className="fixed left-1/2 top-1 z-50 -translate-x-1/2 rounded-full bg-background/95 px-3 py-1 text-[10px] font-bold text-muted-foreground shadow-sm">
-      {t(state.saving ? "backupSaving" : failed ? "backupFailed" : pending ? "backupPending" : "backupSaved")}
-    </span>
+    {(state.saving || failed || pending) && <span role={failed ? "alert" : "status"} className="fixed left-1/2 top-1 z-50 -translate-x-1/2 rounded-full bg-background/95 px-3 py-1 text-[10px] font-bold text-muted-foreground shadow-sm">
+      {t(state.saving ? "backupSaving" : failed ? "backupFailed" : "backupPending")}
+    </span>}
     <Fragment key={restoredVersion}>{children}</Fragment>
   </> : (
     <main className="flex min-h-dvh items-center justify-center">

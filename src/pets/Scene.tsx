@@ -22,11 +22,13 @@ export function Scene({
   home,
   night = false,
   gone = false,
+  className,
   children,
 }: {
   home?: string | undefined;
   night?: boolean;
   gone?: boolean;
+  className?: string;
   children: React.ReactNode;
 }) {
   const place = toHome(home);
@@ -40,6 +42,7 @@ export function Scene({
           : gone
             ? "bg-linear-to-b from-indigo-200 to-violet-100 dark:from-indigo-950 dark:to-violet-950"
             : "bg-sky-200 dark:bg-sky-950",
+        className,
       )}
     >
       {!special && (

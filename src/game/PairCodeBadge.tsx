@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from "@/lib/motion";
 import { Check, Copy, KeyRound } from "lucide-react";
 import { useI18n } from "@/i18n/useI18n";
 import { cn } from "@/lib/utils";
-import { dockIconClass } from "./BottomBar";
 import { QrCode } from "@/pair/QrCode";
 
 /**
@@ -46,7 +45,13 @@ export function PairCodeBadge({ pairCode }: { pairCode: string }) {
         onClick={reveal}
         aria-expanded={open}
         aria-label={open ? t("copyCode") : t("pairingCode")}
-        className={cn(dockIconClass, open && "bg-card text-foreground")}
+        className={cn(
+          "flex size-10 items-center justify-center rounded-full border-b-4 border-black/15 shadow-[0_4px_12px_-6px_var(--primary)]",
+          "transition-[color,background-color,transform] duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring active:translate-y-0.5 active:border-b-2",
+          open
+            ? "bg-linear-to-b from-primary to-primary/80 text-primary-foreground"
+            : "bg-linear-to-b from-secondary to-accent text-primary hover:brightness-110",
+        )}
       >
         {copied ? (
           <Check className="size-5 text-correct" aria-hidden />

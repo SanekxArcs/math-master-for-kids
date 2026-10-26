@@ -60,7 +60,7 @@ const SYMBOLS = [
 export function Backdrop() {
   const reduce = useReducedMotion();
   return (
-    <div className="pointer-events-none absolute inset-0" aria-hidden>
+    <div className="welcome-backdrop pointer-events-none absolute inset-0" aria-hidden>
       <span className="absolute -left-24 -top-24 size-80 rounded-full" style={{ background: "radial-gradient(circle, var(--primary), transparent 70%)", opacity: 0.2 }} />
       <span className="absolute -right-24 top-1/3 size-72 rounded-full" style={{ background: "radial-gradient(circle, var(--option-3), transparent 70%)", opacity: 0.2 }} />
       <span className="absolute -bottom-24 left-1/4 size-80 rounded-full" style={{ background: "radial-gradient(circle, var(--option-0), transparent 70%)", opacity: 0.2 }} />

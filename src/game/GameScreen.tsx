@@ -57,6 +57,7 @@ import { BackupButton } from "@/sync/BackupButton";
 import { LevelRewards } from "./LevelRewards";
 import { prestigeRun } from "./prestige";
 import { PetEncouragement } from "./PetEncouragement";
+import { Backdrop as WelcomeBackdrop } from "./WelcomeShell";
 
 const LOST_FROM = "math_master_lost_from";
 
@@ -362,7 +363,10 @@ export function GameScreen({
   };
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col gap-5 px-4 pb-28 pt-5">
+    <main className="relative mx-auto flex min-h-dvh w-full max-w-xl flex-col gap-5 px-4 pb-28 pt-5">
+      <div className="fixed inset-0 -z-10">
+        <WelcomeBackdrop />
+      </div>
       <GameHud
         score={state.score}
         level={level}

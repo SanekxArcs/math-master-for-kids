@@ -36,7 +36,7 @@ describe("PetArt", () => {
     expect(new Set(ids).size).toBe(ids.length);
     for (const horse of horses) {
       const ownIds = new Set(Array.from(horse.querySelectorAll("[id]")).map((part) => part.id));
-      const fills = Array.from(horse.querySelectorAll('[fill^="url(#"]'));
+      const fills = Array.from(horse.querySelectorAll("[fill]")).filter((part) => part.getAttribute("fill")?.startsWith("url(#"));
       expect(fills.length).toBeGreaterThan(0);
       for (const part of fills) {
         const id = part.getAttribute("fill")!.slice(5, -1);

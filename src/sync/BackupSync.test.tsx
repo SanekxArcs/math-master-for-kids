@@ -25,6 +25,7 @@ describe("BackupSync", () => {
     sync.fail = false;
     localStorage.setItem("math_master_lang", "en");
     render(<I18nProvider><BackupSync identity={identity}><BackupButton /></BackupSync></I18nProvider>);
+    expect(screen.queryByText("Game saved to your profile")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Save to server" }));
     expect(sync.saveNow).toHaveBeenCalledTimes(1);
   });
