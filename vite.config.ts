@@ -35,16 +35,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
-        // The parent route belongs to the installed app version too. Otherwise
-        // a previously unused dashboard chunk can disappear after deployment.
-        globIgnores: ["**/AdminRoute-*.js"],
-        runtimeCaching: [
-          {
-            urlPattern: /\/assets\/(ParentRoute|AdminRoute)-[^/]+\.js$/,
-            handler: "StaleWhileRevalidate",
-            options: { cacheName: "parent-dashboard" },
-          },
-        ],
+        // Keep the entire installed version available, including unopened dashboards.
+        // Recovery also runs in the worker, so it can repair tabs with older app code.
+        importScripts: ["/sw-recovery.js"],
         // The Convex websocket must never be intercepted by the service worker;
         // offline durability is handled by the Dexie outbox, not by caching.
         navigateFallbackDenylist: [/^\/api/, /^\/assets\//],
