@@ -120,7 +120,7 @@ describe("PetsScreen", () => {
     expect(saved().coins).toBe(10);
   });
 
-  it("feeds the pet on screen for coins", async () => {
+  it("buys into supplies, then feeds without charging again", async () => {
     const user = userEvent.setup();
     seed([{ ...newPet("horse", "Bella", Date.now()), food: 30 }], 10);
     renderPets();
@@ -129,6 +129,11 @@ describe("PetsScreen", () => {
     await user.click(within(screen.getByRole("region", { name: "Care options" })).getByRole("button", { name: "Hay, 2 coins" }));
 
     await waitFor(() => expect(saved().coins).toBe(8));
+    expect(saved().inventory?.hay).toBe(1);
+    expect(saved().pets[0]!.food).toBeCloseTo(30, 1);
+    await user.click(screen.getByRole("button", { name: "Use Hay, in stock: 1" }));
+    expect(saved().inventory?.hay ?? 0).toBe(0);
+    expect(saved().coins).toBe(8);
     expect(screen.getByRole("progressbar", { name: "Food" })).toHaveAttribute("aria-valuenow", "55");
   });
 
@@ -140,18 +145,20 @@ describe("PetsScreen", () => {
     const options = screen.getByRole("region", { name: "Care options" });
     await user.click(within(options).getByRole("button", { name: "Hay, 2 coins" }));
     expect(saved().coins).toBe(28);
+    await user.click(screen.getByRole("button", { name: "Use Hay, in stock: 1" }));
     expect(view.container.querySelector(".pet-care-dock .pet-horse")).toHaveClass("act-eat");
     expect(screen.getByRole("progressbar", { name: "Food" })).toHaveAttribute("aria-orientation", "vertical");
     expect(screen.getByRole("button", { name: "Feed" })).toHaveAttribute("aria-expanded", "true");
     await user.click(screen.getByRole("button", { name: "Wash" }));
     expect(within(options).queryByRole("button", { name: /Hay/ })).toBeNull();
     await user.click(within(options).getByRole("button", { name: /Sponge/ }));
+    await user.click(screen.getByRole("button", { name: "Use Sponge, in stock: 1" }));
     expect(view.container.querySelector(".pet-care-dock .pet-horse")).toHaveClass("act-wash");
     await user.click(screen.getByRole("button", { name: "Close options" }));
     expect(screen.queryByRole("region", { name: "Care options" })).toBeNull();
   });
 
-  it("does not sell what the pet does not need or the child cannot afford", async () => {
+  it("allows stocking supplies but prevents unaffordable purchases", async () => {
     const user = userEvent.setup();
     seed([newPet("horse", "Bella", Date.now())], 3);
     renderPets();
@@ -159,7 +166,7 @@ describe("PetsScreen", () => {
     await user.click(screen.getByRole("button", { name: "Heal" }));
     const medicine = within(screen.getByRole("region", { name: "Care options" })).getByRole("button", { name: /Medicine/ });
     expect(medicine).toBeDisabled();
-    expect(within(medicine).getByText("Full")).toBeInTheDocument();
+    expect(within(medicine).getByText("9 more")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Wash" }));
     expect(within(screen.getByRole("region", { name: "Care options" })).getByRole("button", { name: /Shower/ })).toHaveTextContent("2 more");
   });

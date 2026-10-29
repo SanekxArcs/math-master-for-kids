@@ -27,6 +27,7 @@ export function toBackup(stable: Stable, level: number) {
   } catch { /* storage unavailable */ }
   return {
     coins: stable.coins, lastBonusDay: stable.lastBonusDay, pets: stable.pets.map(toPet),
+    inventory: { ...stable.inventory },
     prestigeLevels: stable.prestigeLevels ?? 0,
     activeId: stable.activeId, savedAt: stable.savedAt,
     favoriteId: stable.favoriteId ?? stable.activeId,
@@ -134,6 +135,13 @@ export function useProgressSync(identity: IdentityState) {
       setConflict(remote); setReady(true);
     }
   }, [remote, remember, restore]);
+
+  // Apply parent changes immediately when this device has no unsaved work.
+  useEffect(() => {
+    if (!ready || !base || !remote || remote.status !== "ok" || !remote.progress ||
+        (remote.revision ?? 0) <= (base.revision ?? 0) || inFlight.current || conflict) return;
+    if (readStable().savedAt === base.savedAt) restore(remote.progress, remote.revision);
+  }, [ready, base, remote, conflict, restore]);
 
   const push = useCallback(async (force = false) => {
     if (!args || !base || conflict || inFlight.current) return;

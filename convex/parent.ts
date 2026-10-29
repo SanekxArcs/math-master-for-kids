@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { requireParent } from "./auth";
+import { NEW_STABLE, setVacation } from "../src/engine/pet";
 import { settingsPatchFields } from "./schema";
 import { sha256 } from "./sha256.js";
 
@@ -356,3 +357,19 @@ const LIMITS = {
   goalTarget: { min: 20, max: 10000 },
   halfHalfCooldownSec: { min: 0, max: 600 },
 } as const;
+
+/** Pause care without deleting ownership, supplies or progress. */
+export const vacation = mutation({
+  args: { token: v.string(), on: v.boolean() },
+  handler: async (ctx, { token, on }) => {
+    const profile = await requireParent(ctx, token);
+    const row = await ctx.db.query("progress").withIndex("by_profile", q => q.eq("profileId", profile._id)).unique();
+    if (!row) throw new ConvexError("No pet backup yet");
+    const now = Date.now();
+    const pets = row.pets.map(pet => ({ ...pet, lastPlayedAt: pet.lastPlayedAt ?? 0,
+      owned: pet.owned ?? [], worn: pet.worn ?? {} }));
+    const next = setVacation({ ...NEW_STABLE, pets }, on, now);
+    await ctx.db.patch(row._id, { pets: next.pets, savedAt: Math.max(now, row.savedAt + 1),
+      updatedAt: now, revision: (row.revision ?? 0) + 1 });
+  },
+});

@@ -283,3 +283,26 @@ describe("useProgressSync", () => {
     expect(save.mock.calls.at(-1)?.[0]).toMatchObject({ baseRevision: 8, progress: { coins: 222 } });
   });
 });
+
+it("restores parent holiday changes live without uploading an older snapshot", () => {
+  remote.value = { ...backup({ inventory: { hay: 12 } }), revision: 3 };
+  const hook = renderHook(() => useProgressSync(identity));
+  remote.value = { ...backup({ inventory: { hay: 12 }, pets: [{ ...newPet("horse", "Bella", T0), vacation: true }], savedAt: T0 + 1 }), revision: 4 };
+  hook.rerender();
+  expect(local().pets[0]!.vacation).toBe(true);
+  expect(local().inventory).toEqual({ hay: 12 });
+  expect(toBackup(local(), 3).inventory).toEqual({ hay: 12 });
+  hook.unmount();
+});
+
+it("ignores a delayed cloud snapshot after saving a newer revision", async () => {
+  remote.value = { ...backup(), revision: 7 };
+  save.mockResolvedValueOnce({ status: "ok", applied: true, revision: 8 });
+  const hook = renderHook(() => useProgressSync(identity));
+  act(() => updateStable(s => ({ ...s, inventory: { hay: 8 } })));
+  await act(async () => { await hook.result.current.saveNow?.(); });
+  hook.rerender();
+  expect(local().inventory).toEqual({ hay: 8 });
+  expect(hook.result.current.pending).toBe(false);
+  hook.unmount();
+});

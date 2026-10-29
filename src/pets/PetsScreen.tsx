@@ -16,7 +16,9 @@ import {
   makeFavorite,
   orderedPets,
   adopt,
-  buy,
+  buySupplies,
+  canUseSupply,
+  useSupply,
   buyAccessory,
   canPet,
   canPlay,
@@ -64,6 +66,7 @@ import { CoinCount, CoinIcon } from "./CoinCount";
 import { PetArt, type PetAction } from "./PetArt";
 import { Scene } from "./Scene";
 import { TryOnDialog, Wardrobe, WishBanner } from "./Wardrobe";
+import { SupplyShelf } from "./SupplyShelf";
 import { CatchGame, type GamePhase } from "./CatchGame";
 import { DEFAULT_NAME, ITEM_NAME, SPECIES_NAME, SPECIES_SAYS } from "./names";
 import "./pet-care.css";
@@ -523,11 +526,18 @@ function Stall({
   const reduce = useReducedMotion();
   const [figure, animateFigure] = useAnimate<HTMLButtonElement>();
   const nextId = useRef(0);
+  const timers = useRef(new Set<number>());
+  const later = (callback: () => void, delay: number) => {
+    const timer = window.setTimeout(() => { timers.current.delete(timer); callback(); }, delay);
+    timers.current.add(timer);
+    return timer;
+  };
+  useEffect(() => () => { for (const timer of timers.current) window.clearTimeout(timer); }, []);
 
   const float = (floater: Omit<Floater, "id">) => {
     const id = ++nextId.current;
     setFloaters((current) => [...current.slice(-5), { ...floater, id }]);
-    window.setTimeout(
+    later(
       () => setFloaters((current) => current.filter((each) => each.id !== id)),
       floater.speech ? 3000 : 1200,
     );
@@ -536,7 +546,7 @@ function Stall({
   const act = (kind: PetAction) => {
     const id = ++nextId.current;
     setAction({ id, kind });
-    window.setTimeout(() => setAction((current) => (current?.id === id ? null : current)), ACTION_MS);
+    later(() => setAction((current) => (current?.id === id ? null : current)), ACTION_MS);
   };
 
   // A purchase made in the try-on, celebrated here where the pet is.
@@ -551,9 +561,9 @@ function Stall({
   }, [bought]);
 
   const use = (item: ShopItem) => {
-    if (whyNot(readStable(), pet.id, item) !== null) return;
-    updateStable((current) => buy(current, pet.id, item.id, Date.now()));
-    // A purchase from the lower shop returns to the animal before its reaction.
+    if (game !== null || !canUseSupply(readStable(), pet.id, item, Date.now())) return;
+    updateStable((current) => useSupply(current, pet.id, item.id, Date.now()));
+    // Keep the animal visible for a supply used by tapping its shelf.
     const box = sceneRef.current?.getBoundingClientRect();
     if (box && (box.top < 0 || box.bottom > window.innerHeight - 90)) {
       dockRef.current?.scrollIntoView({ behavior: "instant", block: "start" });
@@ -623,13 +633,13 @@ function Stall({
 
   const startPress = () => {
     heldName.current = false;
-    pressTimer.current = window.setTimeout(() => {
+    pressTimer.current = later(() => {
       heldName.current = true;
       setGrownUpOpen(true);
     }, GROWN_UP_PRESS_MS);
   };
   const endPress = () => {
-    if (pressTimer.current !== null) window.clearTimeout(pressTimer.current);
+    if (pressTimer.current !== null) { window.clearTimeout(pressTimer.current); timers.current.delete(pressTimer.current); }
     pressTimer.current = null;
   };
 
@@ -641,7 +651,7 @@ function Stall({
   const items = itemsFor(pet.species);
   const vacation = onVacation(stable);
   const mud = pet.alive ? Math.floor((100 - pet.clean) / 25) : 0;
-  const tappable = pet.alive && !asleep && game === null;
+  const tappable = pet.alive && !pet.vacation && !asleep && game === null;
 
   return (
     <>
@@ -683,6 +693,7 @@ function Stall({
                   can see the mud. */}
               <motion.button
                 ref={figure}
+                data-pet-target
                 type="button"
                 onPointerDown={tappable ? tapPet : undefined}
                 disabled={!tappable}
@@ -744,6 +755,9 @@ function Stall({
           )}
         </div>
 
+        {pet.alive && <SupplyShelf stable={stable} pet={pet} blocked={asleep || pet.vacation || !pet.alive || game !== null}
+          target={sceneRef} onUse={use} />}
+
         {pet.alive && <fieldset disabled={asleep} className="pet-care-controls min-w-0 border-t border-border/60 p-2 disabled:opacity-50">
           <div className="grid grid-cols-4 gap-1.5">
             {([
@@ -764,24 +778,24 @@ function Stall({
             </div>
             <div className="pet-care-choices flex gap-2 overflow-x-auto pb-1">
               {care === "play" && <>
-                <button type="button" onClick={pat} disabled={!petReady} className="pet-care-choice bg-secondary text-secondary-foreground disabled:opacity-50">
+                <button type="button" onClick={pat} disabled={!petReady || asleep || pet.vacation} className="pet-care-choice bg-secondary text-secondary-foreground disabled:opacity-50">
                   <Hand className="size-6" aria-hidden /><span>{t("petHorse")}</span>
                   <span className="text-[10px] text-muted-foreground">{petReady ? t("careFree") : t("petAgainIn", { minutes: petMinutes })}</span>
                 </button>
-                <button type="button" onClick={() => { setCare(null); setGame("ready"); }} disabled={!playReady || game !== null} className="pet-care-choice bg-secondary text-secondary-foreground disabled:opacity-50">
+                <button type="button" onClick={() => { setCare(null); setGame("ready"); }} disabled={!playReady || asleep || pet.vacation || game !== null} className="pet-care-choice bg-secondary text-secondary-foreground disabled:opacity-50">
                   <span className="text-2xl leading-none" aria-hidden>🎾</span><span>{t("playCatch")}</span>
                   <span className="text-[10px] text-muted-foreground">{playReady ? t("careFree") : t("petAgainIn", { minutes: playMinutes })}</span>
                 </button>
               </>}
               {items.filter((item) => item.kind === care).map((item) => <ItemButton key={item.id} item={item} compact hue={KIND_HUE[care]}
-                refusal={whyNot(stable, pet.id, item)} coins={stable.coins} onUse={() => use(item)} />)}
+                refusal={stable.coins < item.price ? "coins" : null} coins={stable.coins} onUse={(quantity) => { updateStable(current => buySupplies(current, item.id, quantity)); playSound("buy", sound); }} />)}
             </div>
           </section>}
         </fieldset>}
       </motion.section>
 
       {pet.alive ? (
-        <fieldset disabled={asleep} className={cn("contents", asleep && "[&_button]:opacity-50")}>
+        <fieldset disabled={asleep || pet.vacation} className={cn("contents", asleep && "[&_button]:opacity-50")}>
           <section className="rounded-xl border border-border/70 bg-card/90 p-2 shadow-[0_12px_32px_-18px_oklch(0.4_0.16_295/0.45)] backdrop-blur-md">
             <button type="button" aria-expanded={wardrobeOpen} aria-controls={`wardrobe-${pet.id}`}
               onClick={() => setWardrobeOpen((open) => !open)}
@@ -871,17 +885,20 @@ function ItemButton({
   hue: string;
   refusal: ReturnType<typeof whyNot>;
   coins: number;
-  onUse: () => void;
+  onUse: (quantity: number) => void;
   compact?: boolean;
 }) {
   const { t } = useI18n();
   const name = t(ITEM_NAME[item.id] ?? "itemHay");
+  const [quantity, setQuantity] = useState(1);
+  const affordable = Math.floor(coins / item.price);
   return (
+    <div className="pet-shop-choice">
     <motion.button
       type="button"
-      onClick={onUse}
+      onClick={() => onUse(Math.min(quantity, affordable))}
       disabled={refusal !== null}
-      aria-label={t("buyItem", { item: name, price: item.price })}
+      aria-label={t("buyItem", { item: name, price: item.price * Math.min(quantity, Math.max(1, affordable)) })}
       data-state={refusal !== null ? "dim" : undefined}
       whileTap={refusal === null ? { scale: 0.92, rotate: -3 } : {}}
       className={cn("answer-tile flex flex-col items-center gap-1 px-1.5 pb-2 pt-2.5 disabled:cursor-default", compact && "pet-care-choice")}
@@ -900,11 +917,18 @@ function ItemButton({
         ) : (
           <>
             <CoinIcon className="size-3.5" />
-            {refusal === "coins" ? t("needMore", { coins: item.price - coins }) : item.price}
+            {refusal === "coins" ? t("needMore", { coins: item.price - coins }) : item.price * Math.min(quantity, affordable)}
           </>
         )}
       </span>
     </motion.button>
+    <label className="flex items-center justify-center gap-1 text-xs">
+      × <input type="number" min={1} max={Math.max(1, affordable)} value={Math.min(quantity, Math.max(1, affordable))}
+        aria-label={t("supplyQuantity", { item: name })}
+        className="w-14 rounded-lg border border-border bg-card p-1 text-center"
+        onChange={e => setQuantity(Math.max(1, Math.min(Math.max(1, affordable), Math.floor(Number(e.target.value) || 1))))} />
+    </label>
+    </div>
   );
 }
 

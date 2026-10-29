@@ -1,0 +1,40 @@
+// @vitest-environment jsdom
+import { it, expect, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { NEW_STABLE, newPet } from "@/engine";
+import { I18nProvider } from "@/i18n/useI18n";
+import { SupplyShelf } from "./SupplyShelf";
+
+it("drops only on the animal and never uses a cancelled or missed drag", () => {
+  localStorage.setItem("math_master_lang", "en");
+  const pet = { ...newPet("horse", "Bella", Date.now()), food: 30 };
+  const stable = { ...NEW_STABLE, pets: [pet], inventory: { hay: 4 } };
+  const target = document.createElement("div");
+  const animal = document.createElement("button");
+  animal.dataset.petTarget = "";
+  animal.getBoundingClientRect = () => ({ left: 100, top: 100, right: 200, bottom: 200 } as DOMRect);
+  target.append(animal);
+  const onUse = vi.fn();
+  render(<I18nProvider><SupplyShelf stable={stable} pet={pet} blocked={false} target={{ current: target }} onUse={onUse} /></I18nProvider>);
+  const hay = screen.getByRole("button", { name: "Use Hay, in stock: 4" });
+  hay.setPointerCapture = vi.fn();
+  const pointer = (type: string, x: number, y: number) => fireEvent(hay, new MouseEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0 }));
+  pointer("pointerdown", 10, 250);
+  pointer("pointermove", 150, 150);
+  pointer("pointerup", 150, 150);
+  fireEvent.click(hay);
+  expect(onUse).toHaveBeenCalledTimes(1);
+  expect(onUse.mock.calls[0]![0].id).toBe("hay");
+  pointer("pointerdown", 10, 250);
+  pointer("pointermove", 20, 250);
+  pointer("pointerup", 20, 250);
+  fireEvent.click(hay);
+  expect(onUse).toHaveBeenCalledTimes(1);
+  pointer("pointerdown", 10, 250);
+  pointer("pointermove", 150, 150);
+  pointer("pointercancel", 150, 150);
+  fireEvent.click(hay);
+  expect(onUse).toHaveBeenCalledTimes(1);
+  fireEvent.click(hay);
+  expect(onUse).toHaveBeenCalledTimes(2);
+});

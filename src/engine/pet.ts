@@ -234,6 +234,8 @@ export interface Wish {
 
 export interface Stable {
   coins: number;
+  /** Consumable supplies shared by all pets; absent in older saves. */
+  inventory?: Record<string, number>;
   /** Lifetime levels exchanged for prestige. Missing in saves made before prestige. */
   prestigeLevels?: number;
   /** Local calendar day ("2026-09-25") the daily bonus was last paid. */
@@ -258,6 +260,7 @@ export interface Stable {
 }
 
 export const NEW_STABLE: Stable = {
+  inventory: {},
   coins: STARTING_COINS,
   prestigeLevels: 0,
   lastBonusDay: null,
@@ -457,8 +460,32 @@ export function buy(stable: Stable, petId: Species, itemId: string, now: number)
   return { ...withPet(current, pet), coins: current.coins - item.price };
 }
 
+/** Buy supplies without changing needs. No capacity limit beyond the coin balance. */
+export function buySupplies(stable: Stable, itemId: string, quantity = 1): Stable {
+  const item = findItem(itemId);
+  const owned = stable.inventory?.[itemId] ?? 0;
+  if (!item || !Number.isSafeInteger(quantity) || quantity < 1 ||
+      !Number.isSafeInteger(owned + quantity) || stable.coins < item.price * quantity) return stable;
+  return { ...stable, coins: stable.coins - item.price * quantity,
+    inventory: { ...stable.inventory, [itemId]: owned + quantity } };
+}
+
+export function canUseSupply(stable: Stable, petId: Species, item: ShopItem, now: number): boolean {
+  const found = findPet(stable, petId);
+  if (!found || found.vacation || isAsleep(stable) || (stable.inventory?.[item.id] ?? 0) < 1) return false;
+  return whyNot({ ...stable, coins: item.price, pets: stable.pets.map(p => p.id === petId ? tick(p, now) : p) }, petId, item) === null;
+}
+
+export function useSupply(stable: Stable, petId: Species, itemId: string, now: number): Stable {
+  const item = findItem(itemId);
+  if (!item || !canUseSupply(stable, petId, item, now)) return stable;
+  const result = buy({ ...stable, coins: item.price }, petId, itemId, now);
+  return { ...result, coins: stable.coins,
+    inventory: { ...stable.inventory, [itemId]: stable.inventory![itemId]! - 1 } };
+}
+
 export function canPet(pet: Pet, now: number): boolean {
-  return pet.alive && now - pet.lastPettedAt >= PET_COOLDOWN_MS;
+  return pet.alive && !pet.vacation && now - pet.lastPettedAt >= PET_COOLDOWN_MS;
 }
 
 export function cuddle(stable: Stable, petId: Species, now: number): Stable {
@@ -470,7 +497,7 @@ export function cuddle(stable: Stable, petId: Species, now: number): Stable {
 }
 
 export function canPlay(pet: Pet, now: number): boolean {
-  return pet.alive && now - pet.lastPlayedAt >= PLAY_COOLDOWN_MS;
+  return pet.alive && !pet.vacation && now - pet.lastPlayedAt >= PLAY_COOLDOWN_MS;
 }
 
 /** What a round of the catching game is worth, capped so it never replaces care. */

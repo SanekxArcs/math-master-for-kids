@@ -97,6 +97,7 @@ export const petFields = v.object({
 });
 
 export const progressFields = {
+  inventory: v.optional(v.record(v.string(), v.number())),
   coins: v.number(),
   prestigeLevels: v.optional(v.number()),
   lastBonusDay: v.union(v.string(), v.null()),

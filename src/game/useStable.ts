@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { activeProfile, profileKey } from "@/sync/profileScope";
 import {
   NEW_STABLE,
+  SHOP,
   SPECIES,
   accessoriesFor,
   findAccessory,
@@ -110,6 +111,10 @@ export function parseStable(raw: string | null): Stable {
       prestigeLevels: isNum(source.prestigeLevels) ? Math.max(0, Math.floor(source.prestigeLevels)) : 0,
       lastBonusDay: typeof source.lastBonusDay === "string" ? source.lastBonusDay : null,
       pets,
+      inventory: Object.fromEntries(SHOP.flatMap(item => {
+        const count = (source.inventory as Record<string, unknown> | null)?.[item.id];
+        return typeof count === "number" && Number.isSafeInteger(count) && count > 0 ? [[item.id, count]] : [];
+      })),
       activeId,
       favoriteId: isSpecies(source.favoriteId) && pets.some((pet) => pet.id === source.favoriteId) ? source.favoriteId : activeId,
       savedAt: isNum(source.savedAt) ? source.savedAt : 0,

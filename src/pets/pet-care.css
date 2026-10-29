@@ -1,7 +1,6 @@
 /* Keep care and its reaction together while the child browses the shop. */
 .pet-care-dock {
-  position: sticky;
-  top: 5.25rem;
+  position: relative;
   z-index: 20;
   flex-shrink: 0;
   scroll-margin-top: 5.25rem;
@@ -58,3 +57,14 @@
 @media (max-height: 480px) {
   .pet-care-dock { position: relative; top: auto; }
 }
+
+.pet-supply-shelf { padding: 10px; border-top: 1px solid var(--border); background: var(--card); }
+.pet-supply-groups { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px 10px; }
+.pet-supply-group { min-width: 0; border-bottom: 4px solid color-mix(in oklch, var(--primary) 25%, var(--card)); border-radius: 8px; }
+.pet-supply-item { position: relative; display: flex; flex: 0 0 66px; flex-direction: column; align-items: center; gap: 3px; padding: 6px 3px; border-radius: 12px; background: var(--secondary); cursor: grab; user-select: none; }
+.pet-supply-item:disabled { opacity: .5; cursor: default; }
+.pet-supply-item:focus-visible { outline: 3px solid var(--ring); }
+.pet-supply-count { border-radius: 10px; padding: 1px 7px; background: var(--card); font-size: 11px; font-weight: 900; }
+.pet-supply-ghost { position: fixed; z-index: 1000; pointer-events: none; transform: translate(-50%, -65%); font-size: 52px; filter: drop-shadow(0 4px 8px #0004); }
+.pet-shop-choice { display: flex; flex: 0 0 92px; flex-direction: column; gap: 5px; }
+/* Tall care panels must remain scrollable on small screens. */

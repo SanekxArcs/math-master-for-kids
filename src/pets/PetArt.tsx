@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import { memo, type ComponentType } from "react";
 import type { Mood, Species, Worn } from "@/engine";
 import { cn } from "@/lib/utils";
 import type { SpeciesArtProps } from "./art/parts";
@@ -52,7 +52,7 @@ interface PetArtProps {
 
 const NOTHING_WORN: Worn = {};
 
-export function PetArt({
+export const PetArt = memo(function PetArt({
   species,
   mood = "ok",
   mud = 0,
@@ -72,7 +72,7 @@ export function PetArt({
       {action === "wash" && <Bubbles />}
     </svg>
   );
-}
+});
 
 const BUBBLES = [
   [60, 120, 7, 0],

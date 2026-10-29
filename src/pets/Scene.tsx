@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { motion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import "./scene.css";
@@ -52,7 +53,7 @@ export function Scene({
           preserveAspectRatio="xMidYMax slice"
           aria-hidden
         >
-          <Backdrop home={place} />
+          <MemoBackdrop home={place} />
         </svg>
       )}
       {!special && place === "meadow" && (
@@ -89,6 +90,8 @@ export function ScenePreview({ home, className }: { home: string; className?: st
 
 /** The ground line every home keeps, so the pet stands at the same height in all of them. */
 const GROUND = "M-20 262Q200 226 420 262V320H-20z";
+
+const MemoBackdrop = memo(Backdrop);
 
 function Backdrop({ home }: { home: Home }) {
   switch (home) {

@@ -128,7 +128,7 @@ export function Overview({
         </ul>
       </Panel>
 
-      <PetsPanel pets={(data.progress?.pets ?? []).flatMap((raw) => readPet(raw) ?? [])} now={now} />
+      <PetsPanel token={token} pets={(data.progress?.pets ?? []).flatMap((raw) => readPet(raw) ?? [])} now={now} />
 
       <div className="grid gap-4 md:grid-cols-2">
         <Panel delay={0.1}>
@@ -276,10 +276,11 @@ function SuggestionRow({ suggestion, token }: { suggestion: Suggestion; token: s
 }
 
 /** The pets as of the last backup, brought up to now, so a hungry one shows. */
-function PetsPanel({ pets, now }: { pets: Pet[]; now: number }) {
+function PetsPanel({ pets, now, token }: { pets: Pet[]; now: number; token: string }) {
   const { t } = useI18n();
   return (
     <Panel delay={0.08}>
+      <VacationControl token={token} pets={pets} />
       <PanelTitle icon={HeartPulse} title={t("petsTitle")} hint={t("petsHint")} hue="var(--option-3)" />
       {pets.length === 0 ? (
         <EmptyNote>{t("noPetsYet")}</EmptyNote>
@@ -331,4 +332,21 @@ function PetsPanel({ pets, now }: { pets: Pet[]; now: number }) {
       )}
     </Panel>
   );
+}
+
+function VacationControl({ token, pets }: { token: string; pets: Pet[] }) {
+  const { t } = useI18n();
+  const change = useMutation(api.parent.vacation);
+  const [state, setState] = useState<"idle" | "busy" | "error">("idle");
+  const on = pets.length > 0 && pets.every(p => p.vacation);
+  return <div className="mb-4 rounded-xl bg-secondary p-3">
+    <h3 className="font-black">🏖️ {t("vacationTitle")}</h3>
+    <p className="my-2 text-sm text-muted-foreground">{t("vacationBlurb")}</p>
+    <button type="button" disabled={!pets.length || state === "busy"} aria-pressed={on}
+      className="rounded-full bg-primary px-4 py-2 font-bold text-primary-foreground disabled:opacity-50"
+      onClick={async () => { setState("busy"); try { await change({ token, on: !on }); setState("idle"); } catch { setState("error"); } }}>
+      {t(on ? "vacationOff" : "vacationOn")}
+    </button>
+    {state === "error" && <p role="alert">{t("couldNotSave")}</p>}
+  </div>;
 }
