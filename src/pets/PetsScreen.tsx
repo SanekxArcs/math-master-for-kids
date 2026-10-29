@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { MotionSetting } from "@/components/MotionSetting";
 import { BackupButton } from "@/sync/BackupButton";
 import { AnimatePresence, motion, useAnimate, useReducedMotion, type MotionStyle } from "@/lib/motion";
-import { Apple, ChevronDown, Droplets, Hand, Heart, Moon, PawPrint, Pause, Play, Plus, Shirt, Sparkles, Star, Stethoscope, X } from "lucide-react";
+import { Apple, ChevronDown, Droplets, Hand, Heart, Moon, PawPrint, Pause, Play, Plus, Shirt, Star, Stethoscope, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   NAME_MAX,
@@ -34,7 +34,6 @@ import {
   setVacation,
   shownMood,
   toggleWear,
-  whyNot,
   whyNotAdopt,
   type Accessory,
   type ItemKind,
@@ -66,9 +65,10 @@ import { CoinCount, CoinIcon } from "./CoinCount";
 import { PetArt, type PetAction } from "./PetArt";
 import { Scene } from "./Scene";
 import { TryOnDialog, Wardrobe, WishBanner } from "./Wardrobe";
-import { SupplyShelf } from "./SupplyShelf";
+import { SupplyShop } from "./SupplyShop";
+import { DailyStreak } from "@/game/DailyStreak";
 import { CatchGame, type GamePhase } from "./CatchGame";
-import { DEFAULT_NAME, ITEM_NAME, SPECIES_NAME, SPECIES_SAYS } from "./names";
+import { DEFAULT_NAME, SPECIES_NAME, SPECIES_SAYS } from "./names";
 import "./pet-care.css";
 
 export { SPECIES_NAME } from "./names";
@@ -90,13 +90,6 @@ const STATS: { stat: Stat; emoji: string; label: TranslationKey }[] = [
   { stat: "clean", emoji: "🫧", label: "statClean" },
   { stat: "happy", emoji: "💛", label: "statHappy" },
   { stat: "health", emoji: "❤️", label: "statHealth" },
-];
-
-const KINDS: { kind: ItemKind; label: TranslationKey }[] = [
-  { kind: "food", label: "shopFood" },
-  { kind: "play", label: "shopPlay" },
-  { kind: "care", label: "shopCare" },
-  { kind: "vet", label: "shopVet" },
 ];
 
 /** What the pet does with each kind of thing it is given. */
@@ -172,6 +165,8 @@ export function PetsScreen() {
         </div>
         <CoinCount coins={stable.coins} className="text-lg" />
       </header>
+
+      <DailyStreak stable={stable} />
 
       {pet ? (
         <>
@@ -466,12 +461,7 @@ function AdoptDialog({ stable, onClose }: { stable: Stable; onClose: () => void 
 }
 
 /** A hue per kind of item, from the answer-tile palette. */
-const KIND_HUE: Record<ItemKind, string> = {
-  food: "var(--option-1)",
-  play: "var(--option-3)",
-  care: "var(--option-0)",
-  vet: "var(--option-4)",
-};
+
 
 /** Something floating up off the pet: an emoji, or a few words it says. */
 interface Floater {
@@ -755,43 +745,45 @@ function Stall({
           )}
         </div>
 
-        {pet.alive && <SupplyShelf stable={stable} pet={pet} blocked={asleep || pet.vacation || !pet.alive || game !== null}
-          target={sceneRef} onUse={use} />}
-
-        {pet.alive && <fieldset disabled={asleep} className="pet-care-controls min-w-0 border-t border-border/60 p-2 disabled:opacity-50">
-          <div className="grid grid-cols-4 gap-1.5">
-            {([
-              ["play", Play, "carePlay"], ["food", Apple, "careFeed"],
-              ["care", Droplets, "careWash"], ["vet", Stethoscope, "careHeal"],
-            ] as const).map(([kind, Icon, label]) => <button key={kind} type="button"
-              aria-expanded={care === kind} aria-controls={care === kind ? `pet-care-${pet.id}` : undefined}
-              onClick={() => setCare((current) => current === kind ? null : kind)}
-              className={cn("flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border-b-2 border-black/15 px-1 py-2 font-display text-xs font-black transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring",
-                care === kind ? "bg-primary text-primary-foreground shadow-sm" : "bg-secondary text-secondary-foreground hover:bg-primary/15")}>
-              <Icon className="size-5" aria-hidden />{t(label)}
-            </button>)}
-          </div>
-          {care && <section id={`pet-care-${pet.id}`} aria-label={t("careOptions")} className="pet-care-options mt-2 rounded-2xl bg-muted/45 p-2">
+        {pet.alive && <div className="pet-care-controls min-w-0 border-t border-border/60 p-2">
+          <button type="button" aria-expanded={care !== null} aria-controls={`pet-shop-${pet.id}`}
+            onClick={() => setCare(current => current === null ? "food" : null)}
+            className="flex w-full items-center gap-2 rounded-xl bg-secondary px-3 py-2.5 text-left font-display font-black focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring">
+            <span aria-hidden>🛒</span><span className="flex-1">{t("petShop")}</span>
+            <span className="text-xs text-muted-foreground">{t("supplyStockTotal", { count: Object.values(stable.inventory ?? {}).reduce((a, b) => a + b, 0) })}</span>
+            <ChevronDown className={cn("size-5 transition-transform", care && "rotate-180")} aria-hidden />
+          </button>
+          {care && <section id={`pet-shop-${pet.id}`} aria-label={t("careOptions")} className="pet-care-options mt-2 rounded-2xl bg-muted/45 p-2">
             <div className="mb-2 flex items-center justify-between gap-2">
-              <h3 className="text-xs font-black text-muted-foreground">{t(KINDS.find((entry) => entry.kind === care)!.label)}</h3>
-              <button type="button" aria-label={t("careClose")} onClick={() => setCare(null)} className="-my-1 flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="size-4" aria-hidden /></button>
+              <p className="text-xs text-muted-foreground">{t("supplyHint")}</p>
+              <button type="button" aria-label={t("careClose")} onClick={() => setCare(null)} className="flex size-8 shrink-0 items-center justify-center rounded-full hover:bg-muted"><X className="size-4" aria-hidden /></button>
             </div>
-            <div className="pet-care-choices flex gap-2 overflow-x-auto pb-1">
-              {care === "play" && <>
-                <button type="button" onClick={pat} disabled={!petReady || asleep || pet.vacation} className="pet-care-choice bg-secondary text-secondary-foreground disabled:opacity-50">
-                  <Hand className="size-6" aria-hidden /><span>{t("petHorse")}</span>
-                  <span className="text-[10px] text-muted-foreground">{petReady ? t("careFree") : t("petAgainIn", { minutes: petMinutes })}</span>
-                </button>
-                <button type="button" onClick={() => { setCare(null); setGame("ready"); }} disabled={!playReady || asleep || pet.vacation || game !== null} className="pet-care-choice bg-secondary text-secondary-foreground disabled:opacity-50">
-                  <span className="text-2xl leading-none" aria-hidden>🎾</span><span>{t("playCatch")}</span>
-                  <span className="text-[10px] text-muted-foreground">{playReady ? t("careFree") : t("petAgainIn", { minutes: playMinutes })}</span>
-                </button>
-              </>}
-              {items.filter((item) => item.kind === care).map((item) => <ItemButton key={item.id} item={item} compact hue={KIND_HUE[care]}
-                refusal={stable.coins < item.price ? "coins" : null} coins={stable.coins} onUse={(quantity) => { updateStable(current => buySupplies(current, item.id, quantity)); playSound("buy", sound); }} />)}
+            <div className="mb-2 grid grid-cols-4 gap-1.5" role="group" aria-label={t("petShop")}>
+              {([
+                ["food", Apple, "careFeed"], ["care", Droplets, "careWash"],
+                ["vet", Stethoscope, "careHeal"], ["play", Play, "carePlay"],
+              ] as const).map(([kind, Icon, label]) => <button key={kind} type="button"
+                aria-pressed={care === kind} onClick={() => setCare(kind)}
+                className={cn("flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-xs font-black focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring",
+                  care === kind ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground")}>
+                <Icon className="size-4" aria-hidden />{t(label)}
+              </button>)}
             </div>
+            {care === "play" && <div className="mb-2 grid grid-cols-2 gap-2">
+              <button type="button" onClick={pat} disabled={!petReady || asleep || pet.vacation} className="pet-care-choice bg-secondary disabled:opacity-50">
+                <Hand className="size-5" aria-hidden /><span>{t("petHorse")}</span>
+                <span className="text-[10px] text-muted-foreground">{petReady ? t("careFree") : t("petAgainIn", { minutes: petMinutes })}</span>
+              </button>
+              <button type="button" onClick={() => { setCare(null); setGame("ready"); }} disabled={!playReady || asleep || pet.vacation || game !== null} className="pet-care-choice bg-secondary disabled:opacity-50">
+                <span className="text-xl" aria-hidden>🎾</span><span>{t("playCatch")}</span>
+                <span className="text-[10px] text-muted-foreground">{playReady ? t("careFree") : t("petAgainIn", { minutes: playMinutes })}</span>
+              </button>
+            </div>}
+            <SupplyShop stable={stable} pet={pet} items={items.filter(item => item.kind === care)}
+              blocked={asleep || pet.vacation || game !== null} target={sceneRef} onUse={use}
+              onBuy={(item, quantity) => { updateStable(current => buySupplies(current, item.id, quantity)); playSound("buy", sound); }} />
           </section>}
-        </fieldset>}
+        </div>}
       </motion.section>
 
       {pet.alive ? (
@@ -873,65 +865,6 @@ function RenameDialog({ pet, onClose }: { pet: Pet; onClose: () => void }) {
 }
 
 /** A shop item, as a candy tile in its kind's colour, with its price on a coin. */
-function ItemButton({
-  item,
-  hue,
-  refusal,
-  coins,
-  onUse,
-  compact = false,
-}: {
-  item: ShopItem;
-  hue: string;
-  refusal: ReturnType<typeof whyNot>;
-  coins: number;
-  onUse: (quantity: number) => void;
-  compact?: boolean;
-}) {
-  const { t } = useI18n();
-  const name = t(ITEM_NAME[item.id] ?? "itemHay");
-  const [quantity, setQuantity] = useState(1);
-  const affordable = Math.floor(coins / item.price);
-  return (
-    <div className="pet-shop-choice">
-    <motion.button
-      type="button"
-      onClick={() => onUse(Math.min(quantity, affordable))}
-      disabled={refusal !== null}
-      aria-label={t("buyItem", { item: name, price: item.price * Math.min(quantity, Math.max(1, affordable)) })}
-      data-state={refusal !== null ? "dim" : undefined}
-      whileTap={refusal === null ? { scale: 0.92, rotate: -3 } : {}}
-      className={cn("answer-tile flex flex-col items-center gap-1 px-1.5 pb-2 pt-2.5 disabled:cursor-default", compact && "pet-care-choice")}
-      style={{ "--tile": hue } as MotionStyle}
-    >
-      <span className={cn("relative leading-none", compact ? "text-2xl" : "text-4xl drop-shadow-sm")} aria-hidden>
-        {item.emoji}
-      </span>
-      <span className="relative text-xs font-bold leading-tight text-foreground">{name}</span>
-      <span className="relative flex items-center gap-1 rounded-full bg-card/85 px-2 py-0.5 font-display text-xs font-black tabular-nums text-foreground">
-        {refusal === "full" ? (
-          <>
-            <Sparkles className="size-3 text-correct" aria-hidden />
-            {t("itemFull")}
-          </>
-        ) : (
-          <>
-            <CoinIcon className="size-3.5" />
-            {refusal === "coins" ? t("needMore", { coins: item.price - coins }) : item.price * Math.min(quantity, affordable)}
-          </>
-        )}
-      </span>
-    </motion.button>
-    <label className="flex items-center justify-center gap-1 text-xs">
-      × <input type="number" min={1} max={Math.max(1, affordable)} value={Math.min(quantity, Math.max(1, affordable))}
-        aria-label={t("supplyQuantity", { item: name })}
-        className="w-14 rounded-lg border border-border bg-card p-1 text-center"
-        onChange={e => setQuantity(Math.max(1, Math.min(Math.max(1, affordable), Math.floor(Number(e.target.value) || 1))))} />
-    </label>
-    </div>
-  );
-}
-
 /** Twinkling stars and a moon over the sleeping pet. Decoration only. */
 function NightSky() {
   const stars = [

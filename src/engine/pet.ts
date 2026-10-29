@@ -115,6 +115,7 @@ const VITAL: readonly Need[] = ["food", "clean"];
 export const STARTING_COINS = 10;
 /** Extra coins for the first win of each calendar day. */
 export const DAILY_BONUS = 5;
+export const DAILY_STREAK_MAX = 7;
 /** One coin for every this many points of goal. */
 export const POINTS_PER_COIN = 20;
 /** Extra coins for each level above the first: climbing is worth it on its own. */
@@ -240,6 +241,8 @@ export interface Stable {
   prestigeLevels?: number;
   /** Local calendar day ("2026-09-25") the daily bonus was last paid. */
   lastBonusDay: string | null;
+  /** Consecutive rewarded calendar days, capped at seven. */
+  dailyStreak?: number;
   /** Empty until the child first visits and names their horse. */
   pets: Pet[];
   /** The pet on screen. Null only while there are no pets. */
@@ -264,6 +267,7 @@ export const NEW_STABLE: Stable = {
   coins: STARTING_COINS,
   prestigeLevels: 0,
   lastBonusDay: null,
+  dailyStreak: 0,
   pets: [],
   activeId: null,
   favoriteId: null,
@@ -439,7 +443,7 @@ export function whyNot(stable: Stable, petId: Species, item: ShopItem): BuyRefus
   if (!pet) return "noPet";
   if (!pet.alive) return "gone";
   if (!itemsFor(pet.species).includes(item)) return "notForThisPet";
-  const helps = Object.keys(item.effect).some((stat) => pet[stat as Stat] < 100);
+  const helps = Object.keys(item.effect).some((stat) => Math.round(pet[stat as Stat]) < 100);
   if (!helps) return "full";
   if (stable.coins < item.price) return "coins";
   return null;
@@ -741,6 +745,24 @@ export interface SessionEnd {
   level?: number;
 }
 
+/** Calendar dates, rather than 24-hour intervals, survive daylight-saving changes. */
+function calendarDay(key: string): number {
+  const [year, month, day] = key.split("-").map(Number);
+  return Date.UTC(year!, month! - 1, day!) / 86_400_000;
+}
+
+export function dailyStreakStatus(stable: Stable, now: number) {
+  const today = calendarDay(dayKey(now));
+  const last = stable.lastBonusDay ? calendarDay(stable.lastBonusDay) : NaN;
+  const gap = today - last;
+  const previous = Math.min(DAILY_STREAK_MAX, Math.max(1, Math.floor(stable.dailyStreak ?? 1)));
+  // A clock moved backwards must not award another daily bonus.
+  const claimed = gap <= 0;
+  const days = gap <= 1 ? previous : 0;
+  const rewardDay = claimed ? days : Math.min(DAILY_STREAK_MAX, days + 1);
+  return { days, rewardDay, bonus: rewardDay * DAILY_BONUS, claimed };
+}
+
 /**
  * What a finished session pays, or null for nothing.
  *
@@ -757,14 +779,18 @@ export function sessionReward(stable: Stable, session: SessionEnd, now: number):
       ? 0
       : Math.min(Number.MAX_SAFE_INTEGER, Math.floor(Math.floor(session.points / POINTS_PER_COIN) * coinMultiplier(stable.prestigeLevels)));
   if (coins <= 0) return null;
-  return { coins, bonus: stable.lastBonusDay === dayKey(now) ? 0 : DAILY_BONUS };
+  const daily = dailyStreakStatus(stable, now);
+  return { coins, bonus: daily.claimed ? 0 : daily.bonus };
 }
 
 export function payReward(stable: Stable, reward: Reward, now: number): Stable {
+  const daily = dailyStreakStatus(stable, now);
+  const bonus = reward.bonus > 0 && !daily.claimed ? daily.bonus : 0;
   return {
     ...stable,
-    coins: stable.coins + reward.coins + reward.bonus,
-    lastBonusDay: reward.bonus > 0 ? dayKey(now) : stable.lastBonusDay,
+    coins: stable.coins + reward.coins + bonus,
+    lastBonusDay: bonus > 0 ? dayKey(now) : stable.lastBonusDay,
+    dailyStreak: bonus > 0 ? daily.rewardDay : (stable.dailyStreak ?? (stable.lastBonusDay ? 1 : 0)),
   };
 }
 

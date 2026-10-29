@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { it, expect, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { NEW_STABLE, newPet } from "@/engine";
+import { NEW_STABLE, newPet, itemsFor } from "@/engine";
 import { I18nProvider } from "@/i18n/useI18n";
-import { SupplyShelf } from "./SupplyShelf";
+import { SupplyShop } from "./SupplyShop";
 
 it("drops only on the animal and never uses a cancelled or missed drag", () => {
   localStorage.setItem("math_master_lang", "en");
@@ -15,7 +15,7 @@ it("drops only on the animal and never uses a cancelled or missed drag", () => {
   animal.getBoundingClientRect = () => ({ left: 100, top: 100, right: 200, bottom: 200 } as DOMRect);
   target.append(animal);
   const onUse = vi.fn();
-  render(<I18nProvider><SupplyShelf stable={stable} pet={pet} blocked={false} target={{ current: target }} onUse={onUse} /></I18nProvider>);
+  render(<I18nProvider><SupplyShop stable={stable} pet={pet} items={itemsFor(pet.species)} onBuy={vi.fn()} blocked={false} target={{ current: target }} onUse={onUse} /></I18nProvider>);
   const hay = screen.getByRole("button", { name: "Use Hay, in stock: 4" });
   hay.setPointerCapture = vi.fn();
   const pointer = (type: string, x: number, y: number) => fireEvent(hay, new MouseEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0 }));

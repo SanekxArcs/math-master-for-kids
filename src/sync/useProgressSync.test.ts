@@ -179,7 +179,7 @@ describe("useProgressSync", () => {
       { ...newPet("bunny", "Bunny", T0), alive: false, diedAt: T0 },
       newPet("unicorn", "Unicorn", T0), newPet("tiger", "Tiger", T0),
     ];
-    const stable: Stable = { ...NEW_STABLE, coins: 99, pets, activeId: "cat", favoriteId: "dog", savedAt: T0,
+    const stable: Stable = { ...NEW_STABLE, dailyStreak: 6, coins: 99, pets, activeId: "cat", favoriteId: "dog", savedAt: T0,
       asleepSince: T0, lastBonusDay: "2026-09-25", wish: { petId: "cat", itemId: wish.id } };
     const session = { score: { rawPoints: 100, goodStreak: 4, badStreak: 0, bestStreak: 4, correct: 10, wrong: 1 },
       won: true, lost: false, stopped: false, halfHalfReadyAt: T0 + 3000, question: null,

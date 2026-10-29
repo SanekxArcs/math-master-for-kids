@@ -101,6 +101,7 @@ export const progressFields = {
   coins: v.number(),
   prestigeLevels: v.optional(v.number()),
   lastBonusDay: v.union(v.string(), v.null()),
+  dailyStreak: v.optional(v.number()),
   pets: v.array(petFields),
   activeId: v.union(species, v.null()),
   favoriteId: v.optional(v.union(species, v.null())),

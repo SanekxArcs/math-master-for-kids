@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Dialog } from "radix-ui";
 import { ArrowRight, RotateCcw, Star, X } from "lucide-react";
-import { DAILY_BONUS, MAX_LEVEL, coinMultiplier, coinsForLevel, goalForLevel } from "@/engine";
+import { DAILY_BONUS, DAILY_STREAK_MAX, MAX_LEVEL, coinMultiplier, coinsForLevel, goalForLevel } from "@/engine";
+import { useStable } from "./useStable";
+import { DailyStreak } from "./DailyStreak";
 import { useI18n } from "@/i18n/useI18n";
 import { CoinIcon } from "@/pets/CoinCount";
 import { cn } from "@/lib/utils";
@@ -16,6 +18,7 @@ export function LevelRewards({ open, onOpenChange, level, baseGoal, prestigeLeve
   prestigeLevels: number; earnedLevels: number; canPrestige: boolean; goalEnabled: boolean; onPrestige: () => void;
 }) {
   const { t } = useI18n();
+  const stable = useStable();
   const [all, setAll] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const reward = (n: number) => coinsForLevel(goalForLevel(baseGoal, n), n, prestigeLevels);
@@ -27,6 +30,7 @@ export function LevelRewards({ open, onOpenChange, level, baseGoal, prestigeLeve
         <Star className="mb-2 size-8 text-primary" fill="currentColor" aria-hidden="true" />
         <Dialog.Title className="pr-8 font-display text-2xl font-black">{t("levelRewardsTitle")}</Dialog.Title>
         <Dialog.Description className="mt-1 text-sm text-muted-foreground">{t("coinMultiplier", { multiplier: multiplierLabel(prestigeLevels) })}</Dialog.Description>
+        <DailyStreak stable={stable} expanded />
         {goalEnabled ? <>
           <div className="mt-4 grid grid-cols-2 gap-3">
             {[level, ...(level < MAX_LEVEL ? [level + 1] : [])].map((n) => <div key={n} className="rounded-lg border border-primary/20 bg-primary/5 p-3">
@@ -35,7 +39,7 @@ export function LevelRewards({ open, onOpenChange, level, baseGoal, prestigeLeve
               <p className="mt-2 flex items-center gap-1 font-display text-2xl font-black text-primary"><CoinIcon className="size-6" />{reward(n)}</p>
             </div>)}
           </div>
-          <p className="mt-3 text-xs text-muted-foreground">{t("dailyRewardNote", { bonus: DAILY_BONUS })}</p>
+          <p className="mt-3 text-xs text-muted-foreground">{t("dailyRewardNote", { bonus: DAILY_BONUS * DAILY_STREAK_MAX })}</p>
           <button type="button" onClick={() => setAll(!all)} aria-expanded={all} className={cn(secondaryActionClass, "mt-4 py-2 text-sm")}>{t(all ? "hideAllRewards" : "allLevelRewards")}</button>
           {all && <div className="scroll-area mt-3 max-h-60 overflow-y-auto rounded-lg border border-border">
             <table className="w-full text-right text-sm"><thead className="sticky top-0 bg-secondary text-secondary-foreground"><tr><th className="p-2 text-left">{t("rewardLevelColumn")}</th><th className="p-2">{t("rewardGoalColumn")}</th><th className="p-2">{t("rewardCoinsColumn")}</th></tr></thead>

@@ -54,6 +54,7 @@ import type { SyncStatus } from "@/sync/useSync";
 import { profileKey } from "@/sync/profileScope";
 import { MotionSetting } from "@/components/MotionSetting";
 import { BackupButton } from "@/sync/BackupButton";
+import { DailyStreak } from "./DailyStreak";
 import { LevelRewards } from "./LevelRewards";
 import { prestigeRun } from "./prestige";
 import { PetEncouragement } from "./PetEncouragement";
@@ -385,6 +386,8 @@ export function GameScreen({
             : null
         }
       />
+
+      <DailyStreak stable={stable} onClick={() => showRewards(true)} />
 
       {/* The play area takes the leftover height and centres in it, so the
           question sits under the child's eyeline on a tall tablet instead of

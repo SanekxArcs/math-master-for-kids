@@ -110,6 +110,7 @@ export function parseStable(raw: string | null): Stable {
       coins: isNum(source.coins) ? Math.max(0, Math.floor(source.coins)) : NEW_STABLE.coins,
       prestigeLevels: isNum(source.prestigeLevels) ? Math.max(0, Math.floor(source.prestigeLevels)) : 0,
       lastBonusDay: typeof source.lastBonusDay === "string" ? source.lastBonusDay : null,
+      dailyStreak: isNum(source.dailyStreak) ? Math.min(7, Math.max(0, Math.floor(source.dailyStreak))) : (typeof source.lastBonusDay === "string" ? 1 : 0),
       pets,
       inventory: Object.fromEntries(SHOP.flatMap(item => {
         const count = (source.inventory as Record<string, unknown> | null)?.[item.id];

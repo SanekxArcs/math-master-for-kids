@@ -21,6 +21,10 @@ describe("consumable supplies", () => {
     expect(useSupply(food, "horse", "hay", now)).toBe(food);
     expect(buySupplies(full, "medicine", 5).inventory?.medicine).toBe(5);
   });
+  it("does not waste food while its bar still rounds to full", () => {
+    const stocked = buySupplies({ ...stable(), pets: [{ ...newPet("horse", "Bella", now), food: 99.99 }] }, "hay");
+    expect(useSupply(stocked, "horse", "hay", now)).toBe(stocked);
+  });
   it("rejects invalid quantities and unaffordable purchases", () => {
     const s = stable();
     for (const n of [0, -1, 1.5, NaN, Infinity, 501, Number.MAX_SAFE_INTEGER]) expect(buySupplies(s, "hay", n)).toBe(s);

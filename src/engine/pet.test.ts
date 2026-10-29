@@ -285,7 +285,7 @@ describe("coins", () => {
     expect(paid.coins).toBe(NEW_STABLE.coins + 10 + DAILY_BONUS);
 
     expect(sessionReward(paid, win, T0 + 2 * HOUR)!.bonus).toBe(0);
-    expect(sessionReward(paid, win, T0 + DAY)!.bonus).toBe(DAILY_BONUS);
+    expect(sessionReward(paid, win, T0 + DAY)!.bonus).toBe(DAILY_BONUS * 2);
   });
 
   it("pays nothing for stopping short of the goal", () => {

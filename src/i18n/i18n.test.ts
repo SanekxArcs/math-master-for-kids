@@ -97,6 +97,7 @@ describe("translate", () => {
       streak: 9,
       accuracy: 10,
       days: 11,
+      day: 2,
       missed: 12,
       percent: 13,
       level: 14,

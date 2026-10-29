@@ -28,6 +28,7 @@ export function toBackup(stable: Stable, level: number) {
   return {
     coins: stable.coins, lastBonusDay: stable.lastBonusDay, pets: stable.pets.map(toPet),
     inventory: { ...stable.inventory },
+    dailyStreak: stable.dailyStreak ?? (stable.lastBonusDay ? 1 : 0),
     prestigeLevels: stable.prestigeLevels ?? 0,
     activeId: stable.activeId, savedAt: stable.savedAt,
     favoriteId: stable.favoriteId ?? stable.activeId,
@@ -110,7 +111,7 @@ export function useProgressSync(identity: IdentityState) {
     const legacyStable = parseStable(JSON.stringify(remote.progress));
     const sameLegacySave = revision === 0 && local.savedAt === remote.progress.savedAt &&
       currentLevel() === remote.progress.level && local.coins === legacyStable.coins &&
-      local.lastBonusDay === legacyStable.lastBonusDay && local.activeId === legacyStable.activeId &&
+      local.lastBonusDay === legacyStable.lastBonusDay && (local.dailyStreak ?? 0) === (legacyStable.dailyStreak ?? 0) && local.activeId === legacyStable.activeId &&
       (local.favoriteId ?? local.activeId) === (legacyStable.favoriteId ?? legacyStable.activeId) &&
       (local.prestigeLevels ?? 0) === (legacyStable.prestigeLevels ?? 0) &&
       JSON.stringify(local.pets) === JSON.stringify(legacyStable.pets) &&
