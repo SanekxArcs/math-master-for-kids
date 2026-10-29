@@ -65,6 +65,8 @@ export const insert = internalMutation({
 export const addDevice = internalMutation({
   args: { profileId: v.id("profiles"), tokenHash: v.string() },
   handler: async (ctx, args) => {
+    const profile = await ctx.db.get(args.profileId);
+    if (!profile || profile.blocked) throw new ConvexError("ACCOUNT_BLOCKED");
     await ctx.db.insert("devices", { ...args, createdAt: Date.now() });
   },
 });

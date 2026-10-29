@@ -28,13 +28,15 @@ import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n/useI18n";
 import { Backdrop, GameDialog, ghostActionClass, primaryActionClass } from "@/game/GameDialog";
 import { Backdrop as WelcomeBackdrop, WelcomeCard, WelcomeShell, fieldClass, labelClass } from "@/game/WelcomeShell";
+import { AdminPassword } from "./AdminPassword";
 import { CoinIcon } from "@/pets/CoinCount";
 import { PracticeTrend } from "@/parent/charts";
 import { Panel, PanelTitle, timeAgo } from "@/parent/ui";
 
 const KEY = "math_master_admin_session";
 
-interface AdminSession {
+export interface AdminSession {
+  mustChangePassword?: boolean;
   token: string;
   expiresAt: number;
 }
@@ -54,6 +56,7 @@ function readSession(): AdminSession | null {
  */
 export function AdminRoute() {
   const [session, setSession] = useState<AdminSession | null>(readSession);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     try {
@@ -69,7 +72,10 @@ export function AdminRoute() {
 
   if (!convex) return null;
   if (!session) return <AdminLogin onSession={setSession} />;
-  return <AdminDashboard session={session} onSignOut={() => setSession(null)} />;
+  if (session.mustChangePassword || changingPassword) return <AdminPassword session={session}
+    onSession={next => { setSession(next); setChangingPassword(false); }}
+    onCancel={() => { if (session.mustChangePassword) setSession(null); else setChangingPassword(false); }} />;
+  return <AdminDashboard session={session} onChangePassword={() => setChangingPassword(true)} onSignOut={() => setSession(null)} />;
 }
 
 function AdminLogin({ onSession }: { onSession: (session: AdminSession) => void }) {
@@ -137,9 +143,12 @@ function AdminLogin({ onSession }: { onSession: (session: AdminSession) => void 
 type Overview = NonNullable<FunctionReturnType<typeof api.admin.overview>>;
 type UserRow = Overview["users"][number];
 
-function AdminDashboard({ session, onSignOut }: { session: AdminSession; onSignOut: () => void }) {
+function AdminDashboard({ session, onSignOut, onChangePassword }: { session: AdminSession; onSignOut: () => void; onChangePassword: () => void }) {
   const { t } = useI18n();
   const logout = useMutation(api.admin.logout);
+  const block = useMutation(api.admin.setBlocked);
+  const [blocking, setBlocking] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const client = useConvex();
 
   /**
@@ -160,7 +169,9 @@ function AdminDashboard({ session, onSignOut }: { session: AdminSession; onSignO
         }),
       );
       setLoadedAt(Date.now());
+      setLoadError(false);
     } catch {
+      setLoadError(true);
       /* offline: keep showing what was loaded last */
     } finally {
       setLoading(false);
@@ -207,6 +218,8 @@ function AdminDashboard({ session, onSignOut }: { session: AdminSession; onSignO
             </span>
           </div>
           <div className="flex items-center gap-1">
+          <button type="button" onClick={onChangePassword} title={t("adminChangePassword")} aria-label={t("adminChangePassword")}
+            className="rounded-full p-2 text-muted-foreground hover:bg-card"><Lock className="size-4" aria-hidden /></button>
           <button
             type="button"
             onClick={() => void load()}
@@ -231,6 +244,7 @@ function AdminDashboard({ session, onSignOut }: { session: AdminSession; onSignO
       </header>
 
       <main className="mx-auto w-full max-w-5xl space-y-4 px-4 py-5 sm:px-6">
+        {loadError && <p role="alert" className="rounded-xl bg-wrong/10 p-3 text-sm text-wrong">{t("pairFailed")}</p>}
         {!data ? (
           <div className="flex justify-center py-20">
             <Loader2 className="size-8 animate-spin text-primary" aria-label={t("loading")} />
@@ -245,7 +259,12 @@ function AdminDashboard({ session, onSignOut }: { session: AdminSession; onSignO
               </Panel>
               <Feed feed={data.feed} />
             </div>
-            <UserList users={data.users} onDelete={setDeleting} />
+            <UserList users={data.users} onDelete={setDeleting} blocking={blocking} onBlock={async user => {
+              setBlocking(user.id);
+              try { await block({ token: session.token, profileId: user.id, blocked: !user.blocked }); await load(); }
+              catch { setNotice(t("couldNotSave")); }
+              finally { setBlocking(null); }
+            }} />
           </>
         )}
       </main>
@@ -371,7 +390,7 @@ function Feed({ feed }: { feed: Overview["feed"] }) {
   );
 }
 
-function UserList({ users, onDelete }: { users: UserRow[]; onDelete: (user: UserRow) => void }) {
+function UserList({ users, onDelete, onBlock, blocking }: { users: UserRow[]; onDelete: (user: UserRow) => void; onBlock: (user: UserRow) => void; blocking: string | null }) {
   const { t } = useI18n();
   const [search, setSearch] = useState("");
   const shown = useMemo(() => {
@@ -429,6 +448,7 @@ function UserList({ users, onDelete }: { users: UserRow[]; onDelete: (user: User
                         </span>
                         <div className="min-w-0">
                           <p className="truncate font-bold">{user.name}</p>
+                          {user.blocked && <span className="text-xs font-bold text-wrong">{t("adminBlocked")}</span>}
                           <p className="font-mono text-xs tracking-widest text-muted-foreground">{user.pairCode}</p>
                         </div>
                       </div>
@@ -457,7 +477,12 @@ function UserList({ users, onDelete }: { users: UserRow[]; onDelete: (user: User
                     <td className="px-2 py-2.5 text-xs text-muted-foreground">
                       {new Date(user.createdAt).toLocaleDateString()}
                     </td>
-                    <td className="px-2 py-2.5 text-right">
+                    <td className="px-2 py-2.5 text-right whitespace-nowrap">
+                      <button type="button" disabled={blocking !== null} onClick={() => onBlock(user)}
+                        aria-label={t(user.blocked ? "adminUnblockUser" : "adminBlockUser", { name: user.name })}
+                        className={cn("rounded-full p-2 disabled:opacity-40", user.blocked ? "text-correct" : "text-muted-foreground hover:text-wrong")}>
+                        {blocking === user.id ? <Loader2 className="size-4 animate-spin" /> : <Lock className="size-4" aria-hidden />}
+                      </button>
                       <button
                         type="button"
                         onClick={() => onDelete(user)}

@@ -1,4 +1,13 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { isChunkLoadError, recoverChunkError } from "./lib/chunkRecovery";
+import { isLang, translate, type TranslationKey } from "./i18n/translations";
+import { lockParentAccess } from "./sync/parentAccess";
+
+function errorText(key: TranslationKey) {
+  let lang = "uk";
+  try { lang = localStorage.getItem("math_master_lang") ?? lang; } catch { /* storage unavailable */ }
+  return translate(isLang(lang) ? lang : "uk", key);
+}
 
 interface Props {
   children: ReactNode;
@@ -27,6 +36,8 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("[math-master] unhandled error", error, info.componentStack);
+    void recoverChunkError(error);
+    if (error.message.includes("ACCOUNT_BLOCKED")) lockParentAccess();
   }
 
   private reload = () => {
@@ -53,6 +64,8 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (!this.state.error) return this.props.children;
 
+    const stale = isChunkLoadError(this.state.error);
+    const blocked = this.state.error.message.includes("ACCOUNT_BLOCKED");
     return (
       <main
         style={{
@@ -70,15 +83,15 @@ export class ErrorBoundary extends Component<Props, State> {
         <p style={{ fontSize: "3rem", margin: 0 }} aria-hidden>
           🛠️
         </p>
-        <h1 style={{ fontSize: "1.5rem", margin: 0 }}>Something went wrong</h1>
+        <h1 style={{ fontSize: "1.5rem", margin: 0 }}>{stale ? errorText("appUpdateTitle") : blocked ? errorText("adminBlocked") : "Something went wrong"}</h1>
         <p style={{ maxWidth: "32rem", color: "#555", margin: 0 }}>
-          The game hit a problem and stopped. Reloading usually fixes it.
+          {stale ? errorText("appUpdateMessage") : blocked ? errorText("accountBlocked") : "The game hit a problem and stopped. Reloading usually fixes it."}
         </p>
 
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", justifyContent: "center" }}>
           <button
             type="button"
-            onClick={this.reload}
+            onClick={blocked ? () => { window.location.href = "/"; } : this.reload}
             style={{
               padding: "0.75rem 1.5rem",
               borderRadius: "999px",
@@ -89,9 +102,9 @@ export class ErrorBoundary extends Component<Props, State> {
               cursor: "pointer",
             }}
           >
-            Reload
+            {stale ? errorText("appUpdateReload") : blocked ? errorText("chooseRoleAgain") : "Reload"}
           </button>
-          <button
+          {!stale && !blocked && <button
             type="button"
             onClick={() => void this.reset()}
             style={{
@@ -104,7 +117,7 @@ export class ErrorBoundary extends Component<Props, State> {
             }}
           >
             Start fresh on this device
-          </button>
+          </button>}
         </div>
 
         <details style={{ maxWidth: "40rem", color: "#777", fontSize: "0.8rem" }}>

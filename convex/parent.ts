@@ -8,6 +8,8 @@ import { sha256 } from "./sha256.js";
 export const openSession = internalMutation({
   args: { profileId: v.id("profiles"), tokenHash: v.string(), expiresAt: v.number() },
   handler: async (ctx, args) => {
+    const profile = await ctx.db.get(args.profileId);
+    if (!profile || profile.blocked) throw new ConvexError("ACCOUNT_BLOCKED");
     // Opportunistically drop this profile's expired sessions so the table does
     // not grow without bound.
     const stale = await ctx.db

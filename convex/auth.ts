@@ -26,6 +26,7 @@ export async function requireParent(
 
   const profile = await ctx.db.get(session.profileId);
   if (!profile) throw new ConvexError("Profile no longer exists");
+  if (profile.blocked) throw new ConvexError("ACCOUNT_BLOCKED");
   return profile;
 }
 
@@ -43,7 +44,7 @@ export async function checkDevice(
   deviceToken: string,
 ): Promise<Doc<"profiles"> | null> {
   const profile = await ctx.db.get(profileId);
-  if (!profile) return null;
+  if (!profile || profile.blocked) return null;
   const tokenHash = sha256(deviceToken);
   if (safeEqual(profile.deviceTokenHash, tokenHash)) return profile;
 

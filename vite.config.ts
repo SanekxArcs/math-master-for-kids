@@ -35,12 +35,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
-        // Precache is what every install downloads on first run, so the parent
-        // dashboard stays out of it and is fetched the first time a parent
-        // actually opens it — then kept, because the second visit is usually
-        // from the same laptop.
-        // The admin page likewise: only the owner ever opens it.
-        globIgnores: ["**/ParentRoute-*.js", "**/AdminRoute-*.js"],
+        // The parent route belongs to the installed app version too. Otherwise
+        // a previously unused dashboard chunk can disappear after deployment.
+        globIgnores: ["**/AdminRoute-*.js"],
         runtimeCaching: [
           {
             urlPattern: /\/assets\/(ParentRoute|AdminRoute)-[^/]+\.js$/,
@@ -50,7 +47,7 @@ export default defineConfig({
         ],
         // The Convex websocket must never be intercepted by the service worker;
         // offline durability is handled by the Dexie outbox, not by caching.
-        navigateFallbackDenylist: [/^\/api/],
+        navigateFallbackDenylist: [/^\/api/, /^\/assets\//],
       },
       devOptions: { enabled: false },
     }),

@@ -120,6 +120,7 @@ export const progressFields = {
 export default defineSchema({
   profiles: defineTable({
     name: v.string(),
+    blocked: v.optional(v.boolean()),
     avatarEmoji: v.string(),
     /** Six characters, unambiguous alphabet. What the parent types on another PC. */
     pairCode: v.string(),
@@ -177,8 +178,12 @@ export default defineSchema({
     lockedUntil: v.number(),
   }),
 
-  /** Admin page sessions, opened with the ADMIN_PASSWORD environment variable. */
+  adminCredentials: defineTable({ passwordHash: v.string(), passwordSalt: v.string(), updatedAt: v.number() }),
+
+  /** Setup-only sessions cannot read or change account data. */
   adminSessions: defineTable({
+    setupOnly: v.optional(v.boolean()),
+    credentialVersion: v.optional(v.string()),
     tokenHash: v.string(),
     createdAt: v.number(),
     expiresAt: v.number(),

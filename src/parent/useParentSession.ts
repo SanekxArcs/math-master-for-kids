@@ -88,7 +88,7 @@ export function useParentSession() {
       const message = cause instanceof Error ? cause.message : String(cause);
       // The server deliberately returns the same rejection for a wrong code and
       // a wrong PIN; anything else is a transport problem.
-      setError(message.includes("do not match") ? "pairWrong" : "pairFailed");
+      setError(message.includes("ACCOUNT_BLOCKED") ? "accountBlocked" : message.includes("do not match") ? "pairWrong" : "pairFailed");
       return false;
     } finally {
       setBusy(false);

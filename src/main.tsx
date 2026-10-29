@@ -10,6 +10,13 @@ import { convex } from "./lib/convex.ts";
 import { I18nProvider } from "./i18n/useI18n.tsx";
 import { ErrorBoundary } from "./ErrorBoundary.tsx";
 import "./index.css";
+import { isChunkLoadError, recoverChunkError } from "./lib/chunkRecovery";
+
+window.addEventListener("vite:preloadError", event => {
+  const error = (event as Event & { payload?: unknown }).payload;
+  if (!isChunkLoadError(error)) return;
+  void recoverChunkError(error);
+});
 
 // Follow the device's light/dark setting live, as it changes at dusk.
 const darkQuery = window.matchMedia?.("(prefers-color-scheme: dark)");

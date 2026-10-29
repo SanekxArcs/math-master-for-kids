@@ -120,6 +120,7 @@ export const parentLogin = action({
       throw new ConvexError("That pairing code and PIN do not match");
     }
 
+    if (profile.blocked) throw new ConvexError("ACCOUNT_BLOCKED");
     const token = generateToken();
     const expiresAt = Date.now() + PARENT_SESSION_MS;
     await ctx.runMutation(internal.parent.openSession, {
@@ -144,23 +145,39 @@ const ADMIN_PASSWORD_MIN = 12;
  */
 export const adminLogin = action({
   args: { password: v.string() },
-  handler: async (ctx, { password }): Promise<{ token: string; expiresAt: number }> => {
-    const expected = process.env.ADMIN_PASSWORD ?? "";
-    if (expected.length < ADMIN_PASSWORD_MIN) throw new ConvexError("ADMIN_NOT_SET_UP");
-    // Counted before the check, so a burst of parallel guesses is limited too:
-    // ten tries per quarter of an hour, then a quarter of an hour locked.
+  handler: async (ctx, { password }): Promise<{ token: string; expiresAt: number; mustChangePassword: boolean }> => {
     const gate = await ctx.runMutation(internal.admin.beginLogin, {});
     if (gate.locked) throw new ConvexError("ADMIN_LOCKED");
-    // A pause on every attempt, right or wrong: guessing gets slow.
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    // Compared as hashes, so the comparison runs over equal-length strings.
-    if (!safeEqual(sha256(password), sha256(expected))) throw new ConvexError("ADMIN_WRONG");
+    await new Promise(resolve => setTimeout(resolve, 600));
+    const credentials = await ctx.runQuery(internal.admin.credentials, {});
+    const bootstrap = process.env.ADMIN_PASSWORD ?? "";
+    if (!credentials && bootstrap.length < ADMIN_PASSWORD_MIN) throw new ConvexError("ADMIN_NOT_SET_UP");
+    const valid = credentials
+      ? safeEqual(hashPin(password, credentials.passwordSalt), credentials.passwordHash)
+      : safeEqual(sha256(password), sha256(bootstrap));
+    if (!valid) throw new ConvexError("ADMIN_WRONG");
     await ctx.runMutation(internal.admin.loginSucceeded, {});
-
     const token = generateToken();
     const expiresAt = Date.now() + ADMIN_SESSION_MS;
-    await ctx.runMutation(internal.admin.openSession, { tokenHash: sha256(token), expiresAt });
-    return { token, expiresAt };
+    await ctx.runMutation(internal.admin.openSession, { tokenHash: sha256(token), expiresAt,
+      setupOnly: !credentials, credentialVersion: credentials?.passwordHash ?? "bootstrap" });
+    return { token, expiresAt, mustChangePassword: !credentials };
+  },
+});
+
+export const changeAdminPassword = action({
+  args: { token: v.string(), currentPassword: v.string(), newPassword: v.string() },
+  handler: async (ctx, { token, currentPassword, newPassword }): Promise<{ token: string; expiresAt: number; mustChangePassword: boolean }> => {
+    if (newPassword.length < ADMIN_PASSWORD_MIN || newPassword.length > 200) throw new ConvexError("ADMIN_PASSWORD_LENGTH");
+    const current = await ctx.runQuery(internal.admin.passwordForSession, { token });
+    if (current.credentials && !safeEqual(hashPin(currentPassword, current.credentials.passwordSalt), current.credentials.passwordHash)) throw new ConvexError("ADMIN_WRONG");
+    if (newPassword === (process.env.ADMIN_PASSWORD ?? "") ||
+        (current.credentials && safeEqual(hashPin(newPassword, current.credentials.passwordSalt), current.credentials.passwordHash))) throw new ConvexError("ADMIN_PASSWORD_SAME");
+    const passwordSalt = randomBytes(16).toString("base64");
+    const nextToken = generateToken();
+    const expiresAt = Date.now() + ADMIN_SESSION_MS;
+    await ctx.runMutation(internal.admin.setPassword, { token, passwordSalt, passwordHash: hashPin(newPassword, passwordSalt), nextTokenHash: sha256(nextToken), expiresAt });
+    return { token: nextToken, expiresAt, mustChangePassword: false };
   },
 });
 
@@ -207,6 +224,7 @@ export const linkDevice = action({
       throw new ConvexError("That pairing code and PIN do not match");
     }
 
+    if (profile.blocked) throw new ConvexError("ACCOUNT_BLOCKED");
     const deviceToken = generateToken();
     await ctx.runMutation(internal.profiles.addDevice, {
       profileId: profile._id,
@@ -228,6 +246,7 @@ export const linkChildDevice = action({
     }
     const profile = await ctx.runQuery(internal.profiles.findByPairCode, { pairCode: code });
     if (!profile) throw new ConvexError("That game code was not found");
+    if (profile.blocked) throw new ConvexError("ACCOUNT_BLOCKED");
     const deviceToken = generateToken();
     await ctx.runMutation(internal.profiles.addDevice, {
       profileId: profile._id, tokenHash: sha256(deviceToken),

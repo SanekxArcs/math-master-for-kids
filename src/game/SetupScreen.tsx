@@ -274,7 +274,7 @@ export function RestoreForm({
     try {
       await onRestore(code);
     } catch (cause) {
-      setError(String(cause).includes("not found") ? t("gameCodeWrong") : t("pairFailed"));
+      setError(String(cause).includes("ACCOUNT_BLOCKED") ? t("accountBlocked") : String(cause).includes("not found") ? t("gameCodeWrong") : t("pairFailed"));
       submitting.current = false;
       setBusy(false);
     }

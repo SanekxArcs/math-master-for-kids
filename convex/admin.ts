@@ -1,5 +1,5 @@
 import { ConvexError, v } from "convex/values";
-import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { sha256 } from "./sha256.js";
@@ -20,7 +20,9 @@ async function isAdmin(ctx: QueryCtx | MutationCtx, token: string): Promise<bool
     .query("adminSessions")
     .withIndex("by_tokenHash", (q) => q.eq("tokenHash", sha256(token)))
     .unique();
-  return session !== null && session.expiresAt >= Date.now();
+  const credentials = await ctx.db.query("adminCredentials").first();
+  return session !== null && session.expiresAt >= Date.now() && !session.setupOnly &&
+    credentials !== null && session.credentialVersion === credentials.passwordHash;
 }
 
 async function requireAdmin(ctx: QueryCtx | MutationCtx, token: string): Promise<void> {
@@ -28,8 +30,10 @@ async function requireAdmin(ctx: QueryCtx | MutationCtx, token: string): Promise
 }
 
 export const openSession = internalMutation({
-  args: { tokenHash: v.string(), expiresAt: v.number() },
+  args: { tokenHash: v.string(), expiresAt: v.number(), setupOnly: v.boolean(), credentialVersion: v.string() },
   handler: async (ctx, args) => {
+    const credentials = await ctx.db.query("adminCredentials").first();
+    if (args.setupOnly ? credentials !== null : credentials?.passwordHash !== args.credentialVersion) throw new ConvexError("ADMIN_WRONG");
     // Drop expired sessions as new ones open, so the table never grows.
     for (const stale of await ctx.db.query("adminSessions").collect()) {
       if (stale.expiresAt < Date.now()) await ctx.db.delete(stale._id);
@@ -198,6 +202,7 @@ export const overview = query({
           return {
             id: profile._id,
             name: profile.name,
+            blocked: profile.blocked ?? false,
             avatarEmoji: profile.avatarEmoji,
             pairCode: profile.pairCode,
             locale: profile.locale,
@@ -285,5 +290,43 @@ export const deleteProfile = mutation({
       await ctx.scheduler.runAfter(0, internal.admin.purgeRemaining, { profileId });
     }
     return { deleted: true as const, name: profile.name };
+  },
+});
+
+export const credentials = internalQuery({
+  args: {}, handler: async ctx => ctx.db.query("adminCredentials").first(),
+});
+
+export const passwordForSession = internalQuery({
+  args: { token: v.string() },
+  handler: async (ctx, { token }) => {
+    const session = await ctx.db.query("adminSessions").withIndex("by_tokenHash", q => q.eq("tokenHash", sha256(token))).unique();
+    const credentials = await ctx.db.query("adminCredentials").first();
+    if (!session || session.expiresAt < Date.now() || (session.setupOnly ? credentials !== null : (!credentials || session.credentialVersion !== credentials.passwordHash))) throw new ConvexError("ADMIN_SIGNED_OUT");
+    return { credentials, setupOnly: session.setupOnly === true };
+  },
+});
+
+export const setPassword = internalMutation({
+  args: { token: v.string(), passwordHash: v.string(), passwordSalt: v.string(), nextTokenHash: v.string(), expiresAt: v.number() },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.query("adminSessions").withIndex("by_tokenHash", q => q.eq("tokenHash", sha256(args.token))).unique();
+    const credentials = await ctx.db.query("adminCredentials").first();
+    if (!session || session.expiresAt < Date.now() || (session.setupOnly ? credentials !== null : (!credentials || session.credentialVersion !== credentials.passwordHash))) throw new ConvexError("ADMIN_SIGNED_OUT");
+    const fields = { passwordHash: args.passwordHash, passwordSalt: args.passwordSalt, updatedAt: Date.now() };
+    if (credentials) await ctx.db.patch(credentials._id, fields);
+    else await ctx.db.insert("adminCredentials", fields);
+    for (const old of await ctx.db.query("adminSessions").collect()) await ctx.db.delete(old._id);
+    await ctx.db.insert("adminSessions", { tokenHash: args.nextTokenHash, expiresAt: args.expiresAt, createdAt: Date.now(), setupOnly: false, credentialVersion: args.passwordHash });
+  },
+});
+
+export const setBlocked = mutation({
+  args: { token: v.string(), profileId: v.id("profiles"), blocked: v.boolean() },
+  handler: async (ctx, { token, profileId, blocked }) => {
+    await requireAdmin(ctx, token);
+    const profile = await ctx.db.get(profileId);
+    if (!profile) throw new ConvexError("Unknown profile");
+    await ctx.db.patch(profileId, { blocked });
   },
 });
